@@ -24,8 +24,7 @@
 <header class="header" id="header">
   <div class="wrap header__in">
     <a href="#top" class="header__logo" aria-label="Включите свет, на главную">
-      <img src="assets/logo/vkl-round.svg" alt="" width="46" height="46">
-      <span>ВКЛ</span>
+      <img src="assets/logo/vkl-round.svg" alt="Включите свет" width="46" height="46">
     </a>
 
     <nav class="nav" id="nav" aria-label="Основная навигация">
@@ -54,9 +53,9 @@
     </video>
   </div>
 
-  <div class="wrap hero__in">
-    <img src="assets/logo/vkl-round.svg" alt="" class="hero__mark" width="148" height="148">
+  <img src="assets/logo/vkl-round.svg" alt="" class="hero__mark" width="148" height="148">
 
+  <div class="wrap hero__in">
     <h1 class="h-display hero__title">
       <span class="rv-line"><span>Включите</span></span>
       <span class="rv-line"><span>свет</span></span>
@@ -81,10 +80,10 @@
 <div class="strip">
   <div class="wrap strip__in">
     <p class="strip__t">
-      Рекомендуемый размер добровольного пожертвования <b>1000 <span class="rub">₽</span></b>.
+      Пожертвование <b class="nowrap">1000&nbsp;<span class="rub">₽</span></b>.
       Регистрация подтверждается после его поступления.
     </p>
-    <a href="#reg" class="strip__l">Как это работает →</a>
+    <a href="#reg" class="strip__l">Как это работает&nbsp;→</a>
   </div>
 </div>
 
@@ -257,6 +256,24 @@
             в перерывах работает отдельная комната.</p>
         </div>
       </article>
+
+      <article class="card rv" data-d="1">
+        <div class="card__n">07</div>
+        <div>
+          <h3 class="card__t">Мерч</h3>
+          <p class="card__d">Худи, лонги и футболки с местами Писания. Коллекция живёт
+            только три дня конференции.</p>
+        </div>
+      </article>
+
+      <article class="card rv" data-d="2">
+        <div class="card__n">08</div>
+        <div>
+          <h3 class="card__t">Лотерея</h3>
+          <p class="card__d">В последний день разыгрываем подарки от даятелей.
+            Номерок получаешь на стойке регистрации.</p>
+        </div>
+      </article>
     </div>
   </div>
 </section>
@@ -381,12 +398,11 @@
     <img src="assets/img/conf-11@sm.webp" alt="Общение участников" loading="lazy" width="800" height="533">
   </div>
   <div class="gal-row" data-speed="0.06">
-    <img src="assets/img/conf-02@sm.webp" alt="Зал конференции" loading="lazy" width="800" height="533">
     <img src="assets/img/conf-04@sm.webp" alt="Поклонение" loading="lazy" width="800" height="533">
     <img src="assets/img/conf-06@sm.webp" alt="Сессия конференции" loading="lazy" width="800" height="533">
-    <img src="assets/img/conf-08@sm.webp" alt="Молитва за участников" loading="lazy" width="800" height="533">
-    <img src="assets/img/conf-10@sm.webp" alt="Группа прославления" loading="lazy" width="800" height="533">
-    <img src="assets/img/conf-12@sm.webp" alt="Участники конференции" loading="lazy" width="800" height="533">
+    <img src="assets/img/conf-12@sm.webp" alt="Зал конференции" loading="lazy" width="800" height="533">
+    <img src="assets/img/conf-13@sm.webp" alt="Группа прославления" loading="lazy" width="800" height="533">
+    <img src="assets/img/conf-14@sm.webp" alt="Молитва за участников" loading="lazy" width="800" height="533">
   </div>
 </section>
 
@@ -496,26 +512,6 @@
         <p>В перерывах между сессиями работают кофе-брейки: можно выпить чай или кофе
           и подкрепиться.</p>
         <p>Рядом с местом проведения работают кафе, если захочется более плотного обеда.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============================ ЕЩЁ НА КОНФЕРЕНЦИИ ============================ -->
-<section class="section section--tight">
-  <div class="wrap">
-    <div class="mini-grid rv">
-      <div class="mini">
-        <h4>Мерч</h4>
-        <p>Худи, лонги и футболки с местами Писания. Коллекция доступна только в дни конференции.</p>
-      </div>
-      <div class="mini">
-        <h4>Лотерея</h4>
-        <p>В последний день разыгрываем подарки от даятелей. Номерок получаешь на стойке регистрации.</p>
-      </div>
-      <div class="mini">
-        <h4>Онлайн-трансляция</h4>
-        <p>Если приехать не получается, сессии можно смотреть онлайн. Ссылку публикуем в Telegram.</p>
       </div>
     </div>
   </div>
@@ -635,6 +631,14 @@
       </div>
 
       <div class="q">
+        <button class="q__btn" type="button">Будет ли онлайн-трансляция<span class="q__ic" aria-hidden="true"></span></button>
+        <div class="q__body"><div><p>
+          Да, сессии можно смотреть онлайн, если приехать не получается. Ссылку публикуем
+          в Telegram-канале в дни конференции. Регистрация для просмотра не нужна.
+        </p></div></div>
+      </div>
+
+      <div class="q">
         <button class="q__btn" type="button">Можно ли вернуть пожертвование<span class="q__ic" aria-hidden="true"></span></button>
         <div class="q__body"><div><p>
           Если планы изменились, напиши нам в Telegram или позвони. Разберём каждую ситуацию
@@ -736,6 +740,11 @@
       <a href="https://t.me/vkl_svet" class="btn" target="_blank" rel="noopener">Написать в Telegram</a>
     </p>
   </div>
+</div>
+
+<!-- ============================ МОБИЛЬНАЯ ПАНЕЛЬ ============================ -->
+<div class="mbar" id="mbar">
+  <a href="register.html" class="btn">Зарегистрироваться · 1000&nbsp;<span class="rub">₽</span></a>
 </div>
 
 <script src="assets/js/app.js"></script>

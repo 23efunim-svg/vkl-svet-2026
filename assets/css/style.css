@@ -141,7 +141,8 @@ h1, h2, h3, h4 {
 .tnum { font-variant-numeric: tabular-nums; }
 
 /* ₽ в шрифте Europe отсутствует, подставляем системный */
-.rub { font-family: 'Helvetica Neue', Arial, sans-serif; font-weight: 400; }
+.rub { font-family: 'Helvetica Neue', Arial, sans-serif; font-weight: 400; letter-spacing: 0; }
+.nowrap, .price__v { white-space: nowrap; }
 
 /* --- Сетка -------------------------------------------------------------- */
 .wrap {
@@ -248,7 +249,7 @@ h1, h2, h3, h4 {
   font-size: 19px;
   letter-spacing: .02em;
 }
-.header__logo svg, .header__logo img { width: 46px; height: 46px; }
+.header__logo svg, .header__logo img { width: 46px; height: 46px; flex: none; }
 
 .nav {
   display: flex;
@@ -288,16 +289,23 @@ h1, h2, h3, h4 {
 
 @media (max-width: 900px) {
   .burger { display: block; }
+  /* backdrop-filter делает шапку containing block для fixed-потомков,
+     из-за этого выпадающее меню привязывалось к шапке, а не к экрану */
+  .header.is-stuck { backdrop-filter: none; background: rgba(22,21,15,.96); }
   .header .nav {
     position: fixed;
-    inset: 0;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100svh;
     flex-direction: column;
     justify-content: center;
     gap: 26px;
     background: var(--ink);
     transform: translateY(-100%);
     transition: transform .6s var(--ease);
+    visibility: hidden;
   }
+  .header .nav.is-open { visibility: visible; }
   .header .nav.is-open { transform: translateY(0); }
   .nav a { font-size: 20px; }
   .header__cta { display: none; }
@@ -340,14 +348,16 @@ h1, h2, h3, h4 {
 /* знак-печать в правом верхнем углу: по брендбуку акцентный лого ставится в угол макета */
 .hero__mark {
   position: absolute;
+  z-index: 2;
   top: clamp(96px, 15vh, 170px);
   right: var(--gutter);
   width: clamp(78px, 9vw, 132px);
   opacity: .92;
   animation: markIn 1.4s var(--ease) both;
 }
-@media (max-width: 900px) {
-  .hero__mark { top: 82px; width: 64px; opacity: .8; }
+/* на телефоне знак уже есть в шапке, второй раз он только мешает */
+@media (max-width: 760px) {
+  .hero__mark { display: none; }
 }
 @keyframes markIn {
   from { opacity: 0; transform: rotate(-40deg) scale(.7); }
@@ -577,11 +587,13 @@ h1, h2, h3, h4 {
   min-height: 260px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 24px;
+  /* по верху, иначе заголовки в соседних карточках стоят на разной высоте */
+  justify-content: flex-start;
+  gap: clamp(18px, 2.4vw, 34px);
   overflow: hidden;
   transition: background .5s var(--ease);
 }
+.card__t { min-height: 2.05em; }
 .card::before {
   content: '';
   position: absolute;
@@ -1071,7 +1083,7 @@ a.contact:hover .contact__v { color: var(--green); }
   gap: 18px;
   flex-wrap: wrap;
 }
-.strip__t { margin: 0; font-size: clamp(14px, 1.4vw, 17px); line-height: 1.45; }
+.strip__t { margin: 0; font-size: clamp(13.5px, 1.25vw, 16px); line-height: 1.45; flex: 1 1 auto; min-width: 0; }
 .strip__t b { font-weight: 700; }
 .strip__l {
   font-size: 13px;
@@ -1311,3 +1323,207 @@ a.contact:hover .contact__v { color: var(--green); }
   text-transform: none; letter-spacing: 0; margin: 0; cursor: pointer;
 }
 .radio-row input { width: 19px; height: 19px; accent-color: var(--green); margin: 0; }
+
+/* ==========================================================================
+   МОБИЛЬНАЯ ВЁРСТКА
+   ========================================================================== */
+
+/* --- Планшеты (до 1024px) ------------------------------------------------- */
+@media (max-width: 1024px) {
+  .about__grid { gap: 40px; }
+  .day { grid-template-columns: minmax(120px, .6fr) 2fr; gap: 26px; }
+}
+
+/* --- Телефоны (до 760px) --------------------------------------------------- */
+@media (max-width: 760px) {
+
+  :root { --gutter: 18px; }
+  body { font-size: 16px; }
+
+  /* нижняя панель с кнопкой занимает место — освобождаем его в конце страницы */
+  .footer { padding-bottom: 96px; }
+
+  /* --- Шапка --- */
+  .header { padding-block: 10px; }
+  .header__logo img { width: 40px; height: 40px; }
+  .header .nav { gap: 22px; padding-inline: var(--gutter); }
+  .nav a { font-size: 18px; letter-spacing: .06em; }
+
+  /* --- Первый экран --- */
+  .hero {
+    min-height: 100svh;
+    padding-bottom: 34px;
+    align-items: flex-end;
+  }
+  .h-display { font-size: clamp(46px, 15vw, 84px); line-height: .86; }
+  .hero__title { transform: skewX(-5deg); }
+  .hero__sub { font-size: 12px; letter-spacing: .2em; margin-top: 10px; }
+
+  .hero__meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    margin-top: 20px;
+  }
+  .hero__date { font-size: clamp(34px, 11vw, 52px); }
+  .hero__place { font-size: clamp(22px, 7vw, 32px); }
+
+  .hero__actions { flex-direction: column; gap: 10px; margin-top: 24px; width: 100%; }
+  .hero__actions .btn { width: 100%; padding: 17px 20px; font-size: 14px; }
+
+  /* --- Полоса-условие --- */
+  .strip { padding-block: 13px; }
+  .strip__in { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .strip__t { font-size: 14px; }
+
+  /* --- Бегущая строка --- */
+  .ticker { padding-block: 11px; }
+  .ticker__row span { font-size: 17px; padding-inline: 15px; gap: 15px; }
+  .ticker__row span::after { width: 6px; height: 6px; }
+
+  /* --- Секции --- */
+  .section { padding-block: 56px; }
+  .section--tight { padding-block: 44px; }
+  .section-head { gap: 10px; margin-bottom: 26px; }
+  .h2 { font-size: clamp(27px, 8.5vw, 40px); }
+  .h3 { font-size: 20px; }
+  .lead { font-size: 17px; }
+
+  /* --- О конференции --- */
+  .about__grid { grid-template-columns: 1fr; gap: 34px; }
+  .about__lead { font-size: 19px; }
+  .goal { padding: 15px 0; gap: 14px; }
+  .goal__t { font-size: 16.5px; }
+  .quote { padding-left: 16px; margin: 20px 0; }
+  .quote blockquote { font-size: 22px; }
+
+  /* --- Для кого --- */
+  .who-grid { grid-template-columns: 1fr; }
+  .who { padding: 24px 20px; }
+  .who__t { font-size: 19px; }
+
+  /* --- Стих-разделитель --- */
+  .verse { padding-block: 60px; }
+  .verse__q { font-size: 24px; max-width: 14ch; }
+  .verse__ref { font-size: 11px; margin-top: 18px; }
+
+  /* --- Карточки --- */
+  .cards { grid-template-columns: 1fr; }
+  .card { min-height: 0; padding: 24px 20px; gap: 16px; }
+  .card__t { font-size: 21px; }
+  .card__d { font-size: 15px; }
+
+  /* --- Спикеры --- */
+  .speakers__soon { padding: 32px 20px; }
+  .speakers__soon .script { font-size: 34px; }
+
+  /* --- Расписание --- */
+  .day { grid-template-columns: 1fr; gap: 14px; padding-block: 24px; }
+  .day__num { font-size: 48px; }
+  .day__d { align-items: center; }
+  .slot { grid-template-columns: 74px 1fr; gap: 12px; padding: 11px 0; }
+  .slot__t { font-size: 14px; }
+  .slot__n { font-size: 15px; }
+  .slot__tag { display: block; margin: 6px 0 0; width: fit-content; }
+
+  /* --- Вечер хвалы --- */
+  .free { grid-template-columns: 1fr; padding: 26px 20px; gap: 24px; }
+  .free__date { font-size: 30px; }
+  .free__time { font-size: 38px; }
+  .free__side .btn { width: 100%; }
+
+  /* --- Галерея --- */
+  .gal-row { gap: 10px; }
+  .gal-row + .gal-row { margin-top: 10px; }
+  .gal-row img { width: 74vw; }
+
+  /* --- Регистрация --- */
+  .reg__grid { grid-template-columns: 1fr; gap: 32px; }
+  .price { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .price__v { font-size: 68px; }
+  .price__c { max-width: none; font-size: 14.5px; }
+  .warn { padding: 16px 18px; font-size: 15px; gap: 12px; }
+  .incl { grid-template-columns: 1fr; margin-top: 24px; }
+  .reg-cta { padding: 26px 20px; }
+  .sp { font-size: 15px; gap: 12px; padding: 12px 0; }
+
+  /* --- Важное перед поездкой --- */
+  .info-grid { grid-template-columns: 1fr; }
+  .info-cell { padding: 24px 20px; }
+
+  /* --- Локация --- */
+  .place__grid { grid-template-columns: 1fr; gap: 26px; }
+  .map { aspect-ratio: 4 / 3; }
+  .contact { padding: 13px 0; gap: 14px; }
+  .contact__v { font-size: 16px; text-align: right; }
+  .place__grid .btn { width: 100%; }
+
+  /* --- Вопросы --- */
+  .q__btn { font-size: 17px; padding: 19px 0; gap: 16px; }
+  .q__body p { font-size: 15.5px; margin-bottom: 19px; }
+
+  /* --- Финал --- */
+  .final { padding-block: 58px; }
+  .final .btn { width: 100%; }
+
+  /* --- Футер --- */
+  .footer { padding-top: 44px; }
+  .footer__top { grid-template-columns: 1fr; gap: 30px; padding-bottom: 30px; }
+  .footer__bot { flex-direction: column; gap: 10px; font-size: 12px; }
+  .socials a { width: 46px; height: 46px; }
+
+  /* --- Страницы формы --- */
+  .page { padding-top: 76px; }
+  .form-wrap { padding: 22px 18px; }
+  .status-box { padding: 30px 20px; }
+  .row2 { grid-template-columns: 1fr; gap: 0; }
+  .field input, .field select, .field textarea { padding: 14px 15px; font-size: 16px; }
+  .form-actions { flex-direction: column; gap: 10px; }
+  .form-actions .btn { width: 100%; }
+  .summary__row { flex-direction: column; gap: 3px; padding: 11px 16px; font-size: 14.5px; }
+  .summary__row dd { text-align: left; }
+  .done__code { font-size: 24px; padding: 11px 20px; }
+  .modal__box { padding: 24px 20px; }
+  .doc h2 { font-size: 20px; margin: 30px 0 12px; }
+  .doc p, .doc li { font-size: 15.5px; }
+}
+
+/* --- Узкие телефоны (до 380px) --------------------------------------------- */
+@media (max-width: 380px) {
+  .h-display { font-size: 42px; }
+  .price__v { font-size: 56px; }
+  .day__num { font-size: 40px; }
+  .slot { grid-template-columns: 64px 1fr; }
+  .btn { padding: 15px 18px; font-size: 13.5px; }
+}
+
+/* --- Мобильная панель с кнопкой регистрации -------------------------------- */
+.mbar {
+  display: none;
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 90;
+  padding: 10px var(--gutter) calc(10px + env(safe-area-inset-bottom));
+  background: rgba(22,21,15,.94);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid var(--line);
+  transform: translateY(110%);
+  transition: transform .5s var(--ease);
+}
+.mbar.is-on { transform: none; }
+.mbar .btn { width: 100%; padding: 16px 18px; font-size: 14px; }
+
+@media (max-width: 760px) {
+  .mbar { display: block; }
+  /* на странице формы панель не нужна: там и так одна кнопка */
+  .page ~ .mbar, body:has(.form-wrap) .mbar { display: none; }
+}
+
+/* --- Тач-устройства: ховеры не залипают ------------------------------------ */
+@media (hover: none) {
+  .btn:hover { transform: none; box-shadow: none; }
+  .btn:hover::before { transform: translateY(101%); }
+  .card:hover { background: var(--ink); }
+  .gal-row img:hover { filter: contrast(1.03); transform: none; }
+  .socials a:hover { transform: none; }
+}

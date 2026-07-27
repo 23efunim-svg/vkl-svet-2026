@@ -138,4 +138,19 @@
     row.innerHTML = row.innerHTML + row.innerHTML;
   });
 
+  /* --- Мобильная панель: появляется, когда первый экран уехал -------------- */
+  var mbar = $('#mbar');
+  var hero = $('.hero');
+  if (mbar && hero) {
+    var footer = $('.footer');
+    var toggleBar = function () {
+      var pastHero = window.scrollY > hero.offsetHeight * 0.75;
+      // у футера прячем, чтобы не перекрывать реквизиты и ссылки
+      var atFooter = footer && footer.getBoundingClientRect().top < window.innerHeight - 80;
+      mbar.classList.toggle('is-on', pastHero && !atFooter);
+    };
+    window.addEventListener('scroll', toggleBar, { passive: true });
+    toggleBar();
+  }
+
 })();
