@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Пожертвование получено — ВКЛЮЧИТЕ СВЕТ 2026</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#16150F">
+<link rel="icon" href="assets/logo/vkl-round.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<header class="header is-stuck">
+  <div class="wrap header__in">
+    <a href="index.html" class="header__logo">
+      <img src="assets/logo/vkl-round.svg" alt="" width="46" height="46">
+      <span>ВКЛ</span>
+    </a>
+    <a href="tel:+79503254445" class="nav" style="font-size:14px;color:var(--text-dim)">+7 950 325-44-45</a>
+  </div>
+</header>
+
+<div class="page">
+  <div class="wrap page__body">
+
+    <!-- Ожидание подтверждения от платёжного сервиса -->
+    <div class="status-box" id="waiting">
+      <div class="spinner" aria-hidden="true"></div>
+      <h1 class="h3">Проверяем платёж</h1>
+      <p class="dim" style="margin-top:12px">
+        Это занимает несколько секунд. Не закрывай страницу.
+      </p>
+    </div>
+
+    <!-- Платёж подтверждён -->
+    <div class="status-box" id="confirmed" hidden>
+      <div class="done__ic" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+          <path d="M4 12.5l5.5 5.5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h1 class="h3">Пожертвование получено</h1>
+      <p class="dim" style="margin-top:12px">
+        Осталось подтвердить участие, чтобы мы внесли тебя в список.
+      </p>
+      <p style="margin-top:26px">
+        <button class="btn btn--lg btn--shine" id="finishBtn" style="width:100%;max-width:340px">
+          Завершить регистрацию
+        </button>
+      </p>
+    </div>
+
+    <!-- Готово -->
+    <div class="status-box" id="done" hidden>
+      <div class="done__ic" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+          <path d="M4 12.5l5.5 5.5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h1 class="h3">Ты зарегистрирован</h1>
+      <p class="dim" style="margin-top:12px">Назови этот номер на стойке регистрации</p>
+      <div class="done__code" id="ticketCode">—</div>
+
+      <dl class="summary" id="memo" style="margin-top:30px;text-align:left"></dl>
+
+      <p class="dim" style="font-size:14.5px;margin-top:22px">
+        Копию мы отправили на твою почту. Если письма нет, проверь папку «Спам».
+      </p>
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:26px">
+        <a href="https://t.me/vkl_svet" class="btn" target="_blank" rel="noopener">Подписаться на канал</a>
+        <a href="index.html" class="btn btn--ghost">На главную</a>
+      </div>
+    </div>
+
+    <!-- Платёж ещё обрабатывается -->
+    <div class="status-box" id="pending" hidden>
+      <h1 class="h3">Платёж обрабатывается</h1>
+      <p class="dim" style="margin-top:12px">
+        Банк ещё не прислал подтверждение. Обычно это занимает до 15 минут.
+        Деньги при этом не потеряются.
+      </p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:26px">
+        <button class="btn" id="retryBtn">Проверить ещё раз</button>
+        <a href="https://t.me/vkl_svet" class="btn btn--ghost" target="_blank" rel="noopener">Написать нам</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = window.VKL.$;
+
+  var API = '';               // тот же адрес, что в register.js
+  var DEMO = !API;
+
+  var params = new URLSearchParams(location.search);
+  var invId = params.get('InvId') || params.get('inv') || '';
+
+  var show = function (id) {
+    ['waiting', 'confirmed', 'done', 'pending'].forEach(function (k) {
+      $('#' + k).hidden = (k !== id);
+    });
+  };
+
+  var lastData = null;
+  try { lastData = JSON.parse(sessionStorage.getItem('vkl_reg_last') || 'null'); } catch (e) {}
+
+  var makeCode = function (d) {
+    var base = ((d && d.lastName) || '') + ((d && d.phone) || '') + (invId || '0');
+    var h = 0;
+    for (var i = 0; i < base.length; i++) { h = (h * 31 + base.charCodeAt(i)) >>> 0; }
+    return 'ВС-' + String(h % 9000 + 1000);
+  };
+
+  var fillMemo = function (d) {
+    if (!d) return;
+    var rows = [
+      ['Участник', [d.lastName, d.firstName].filter(Boolean).join(' ')],
+      ['Даты', '26–28 ноября 2026'],
+      ['Адрес', 'Волгоград, улица Руднева, 2д'],
+      ['Начало', '26 ноября, регистрация с 16:00']
+    ];
+    if (d.age !== null && d.age < 18) {
+      rows.push(['Не забудь', 'доверенность от родителей на сопровождающего']);
+    }
+    $('#memo').innerHTML = rows.map(function (r) {
+      return '<div class="summary__row"><dt>' + r[0] + '</dt><dd>' + r[1] + '</dd></div>';
+    }).join('');
+  };
+
+  var finish = function () {
+    var btn = $('#finishBtn');
+    btn.disabled = true;
+    btn.textContent = 'Завершаем...';
+
+    var after = function (code) {
+      $('#ticketCode').textContent = code;
+      fillMemo(lastData);
+      show('done');
+    };
+
+    if (DEMO) { setTimeout(function () { after(makeCode(lastData)); }, 700); return; }
+
+    fetch(API + '/finish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invId: invId })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) { after((res && res.ticket) || makeCode(lastData)); })
+      .catch(function () {
+        btn.disabled = false;
+        btn.textContent = 'Завершить регистрацию';
+        alert('Не удалось завершить. Попробуй ещё раз или напиши @vkl_svet.');
+      });
+  };
+
+  var tries = 0;
+  var check = function () {
+    if (DEMO) { setTimeout(function () { show('confirmed'); }, 1200); return; }
+
+    fetch(API + '/status?InvId=' + encodeURIComponent(invId))
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res && res.paid) { show('confirmed'); return; }
+        tries++;
+        if (tries < 30) { setTimeout(check, 2000); }
+        else { show('pending'); }
+      })
+      .catch(function () {
+        tries++;
+        if (tries < 30) { setTimeout(check, 2000); } else { show('pending'); }
+      });
+  };
+
+  $('#finishBtn').addEventListener('click', finish);
+  $('#retryBtn').addEventListener('click', function () { tries = 0; show('waiting'); check(); });
+
+  check();
+})();
+</script>
+</body>
+</html>

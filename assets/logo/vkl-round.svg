@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_4" data-name="Layer 4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #fff;
+      }
+
+      .cls-2 {
+        font-size: 110.64px;
+      }
+
+      .cls-2, .cls-3 {
+        fill: #10c90c;
+        font-family: EuropeNormal, Europe;
+      }
+
+      .cls-3 {
+        font-size: 110.64px;
+      }
+    </style>
+  </defs>
+  <g>
+    <path class="cls-1" d="M109.33,841.87l36.87-295.68,144.35-55.09c19.86-7.58,35.73-11.8,47.62-12.67,11.89-.87,20.46,2.95,25.7,11.46,5.25,8.51,6.58,23.1,4,43.76-1.72,13.8-4.28,25.64-7.67,35.51-3.39,9.88-8.61,18.93-15.65,27.15-7.05,8.22-16.51,15.58-28.39,22.07l-.4,3.18c12.78-4.08,22.3-4.65,28.58-1.7,6.27,2.96,10.07,8.52,11.37,16.7,1.31,8.18,1.1,19.2-.63,33.06-2.9,23.29-8.41,42.17-16.52,56.63-8.11,14.46-18.66,26.02-31.67,34.68-13,8.66-30.27,17.1-51.79,25.31l-145.78,55.64ZM197.87,691.3l-7.23,57.94,55.27-21.1c8.23-3.14,14.88-6.47,19.94-9.99,5.07-3.52,9-7.89,11.81-13.08,2.81-5.2,4.7-11.77,5.7-19.73,1.46-11.74.18-18.49-3.86-20.25-4.04-1.76-12.32-.25-24.84,4.53l-56.79,21.68ZM211.38,582.92l-6.69,53.61,52.77-20.14c9.06-3.46,15.85-6.75,20.36-9.88,4.51-3.13,7.89-7.01,10.14-11.67,2.25-4.65,3.88-10.98,4.88-19,1.18-9.43.49-15.42-2.06-17.96-2.55-2.54-8.51-2.02-17.87,1.55l-61.53,23.48Z"/>
+    <path class="cls-1" d="M489.9,419.5l-13.86,111.17,22-8.4,84.61-138.17,88.63-33.83-114.77,181.95,85.95,110.66-90.87,34.68-62.1-86.67-22,8.4-14.45,115.89-73.25,27.96,36.87-295.68,73.25-27.96Z"/>
+    <path class="cls-1" d="M747.98,323.12l222.7-84.99-36.87,295.68-73.61,28.09,28.32-227.06-79.51,30.35-15.48,124.16c-2.73,21.88-8.06,41.82-15.98,59.82-7.92,18-18.52,33.55-31.8,46.65-13.27,13.11-28.95,23.1-47.01,30-13.24,5.05-25.55,8.62-36.94,10.71l7.97-63.91c4.9-.1,12.23-2.01,22.01-5.74,10.02-3.82,17.4-9.42,22.16-16.8,4.75-7.37,8.04-18.38,9.87-33.01l24.18-193.95Z"/>
+  </g>
+  <g>
+    <text class="cls-2" transform="translate(370.06 521.64) rotate(-71.53) scale(.95 1)"><tspan x="0" y="0">В</tspan></text>
+    <text class="cls-2" transform="translate(389.75 458.28) rotate(-49.06) scale(.95 1)"><tspan x="0" y="0">К</tspan></text>
+    <text class="cls-2" transform="translate(432.31 406.72) rotate(-26.01) scale(.95 1)"><tspan x="0" y="0">Л</tspan></text>
+    <text class="cls-2" transform="translate(493.31 372.05) rotate(1.07) scale(.95 1)"><tspan x="0" y="0">Ю</tspan></text>
+    <text class="cls-2" transform="translate(585.04 374.89) rotate(27.86) scale(.95 1)"><tspan x="0" y="0">Ч</tspan></text>
+    <text class="cls-2" transform="translate(646.53 404.88) rotate(52.16) scale(.95 1)"><tspan x="0" y="0">И</tspan></text>
+    <text class="cls-2" transform="translate(692.46 464.93) rotate(74.44) scale(.95 1)"><tspan x="0" y="0">Т</tspan></text>
+    <text class="cls-2" transform="translate(708.75 519.84) rotate(93.8) scale(.95 1)"><tspan x="0" y="0">Е</tspan></text>
+    <text class="cls-2" transform="translate(703.24 577.45) rotate(107.25) scale(.95 1)"><tspan x="0" y="0"> </tspan></text>
+    <text class="cls-3" transform="translate(692.78 615.95) rotate(128.24) scale(.95 1)"><tspan x="0" y="0">С</tspan></text>
+    <text class="cls-3" transform="translate(654.73 666.74) rotate(150.12) scale(.95 1)"><tspan x="0" y="0">В</tspan></text>
+    <text class="cls-3" transform="translate(597.35 699.94) rotate(170.89) scale(.95 1)"><tspan x="0" y="0">Е</tspan></text>
+    <text class="cls-3" transform="translate(541.55 709.95) rotate(-169.88) scale(.95 1)"><tspan x="0" y="0">Т</tspan></text>
+  </g>
+</svg>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Регистрация — ВКЛЮЧИТЕ СВЕТ 2026</title>
+<meta name="description" content="Регистрация на молодёжную конференцию «Включите свет» 26–28 ноября 2026 года в Волгограде.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#16150F">
+<link rel="icon" href="assets/logo/vkl-round.svg" type="image/svg+xml">
+<link rel="preload" href="assets/fonts/europebold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<header class="header is-stuck">
+  <div class="wrap header__in">
+    <a href="index.html" class="header__logo">
+      <img src="assets/logo/vkl-round.svg" alt="" width="46" height="46">
+      <span>ВКЛ</span>
+    </a>
+    <a href="tel:+79503254445" class="nav" style="font-size:14px;color:var(--text-dim)">+7 950 325-44-45</a>
+  </div>
+</header>
+
+<div class="page">
+  <div class="wrap page__body">
+
+    <div class="page-head center">
+      <a href="index.html" class="back">← На главную</a>
+      <h1 class="h1">Регистрация</h1>
+      <p class="dim" style="margin-top:12px">Молодёжная конференция «Включите свет»<br>26&ndash;28 ноября 2026, Волгоград</p>
+    </div>
+
+    <div class="form-wrap">
+      <div class="steps" aria-hidden="true">
+        <div class="step-dot is-active" data-step="1"></div>
+        <div class="step-dot" data-step="2"></div>
+        <div class="step-dot" data-step="3"></div>
+      </div>
+      <div class="step-label">
+        <span>Шаг <b id="stepNow">1</b> из 3</span>
+        <span id="stepName">Анкета участника</span>
+      </div>
+
+      <form id="regForm" novalidate autocomplete="on">
+        <!-- honeypot: человек это поле не видит, боты заполняют -->
+        <div style="position:absolute;left:-9999px" aria-hidden="true">
+          <label>Не заполняйте это поле<input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+        </div>
+
+        <!-- ================= ШАГ 1: АНКЕТА ================= -->
+        <div class="form-step is-active" data-step="1">
+
+          <div class="row2">
+            <div class="field">
+              <label for="lastName">Фамилия <span class="req">*</span></label>
+              <input type="text" id="lastName" name="lastName" autocomplete="family-name" required>
+              <div class="field__err">Укажи фамилию</div>
+            </div>
+            <div class="field">
+              <label for="firstName">Имя <span class="req">*</span></label>
+              <input type="text" id="firstName" name="firstName" autocomplete="given-name" required>
+              <div class="field__err">Укажи имя</div>
+            </div>
+          </div>
+
+          <div class="field" id="patronymicField">
+            <label for="patronymic">Отчество</label>
+            <input type="text" id="patronymic" name="patronymic" autocomplete="additional-name">
+            <div class="field__err">Отчество нужно для доверенности</div>
+          </div>
+
+          <div class="row2">
+            <div class="field">
+              <label for="birthDate">Дата рождения <span class="req">*</span></label>
+              <input type="date" id="birthDate" name="birthDate" required min="1930-01-01" max="2015-12-31">
+              <div class="field__err">Укажи дату рождения</div>
+            </div>
+            <div class="field">
+              <label>Пол <span class="req">*</span></label>
+              <div class="radio-row" style="padding-top:12px">
+                <label><input type="radio" name="gender" value="Мужской" required> Мужской</label>
+                <label><input type="radio" name="gender" value="Женский"> Женский</label>
+              </div>
+              <div class="field__err">Выбери пол, это нужно для расселения</div>
+            </div>
+          </div>
+
+          <!-- предупреждение по возрасту -->
+          <div id="ageBlock" hidden></div>
+
+          <div class="row2">
+            <div class="field">
+              <label for="phone">Телефон <span class="req">*</span></label>
+              <input type="tel" id="phone" name="phone" placeholder="+7 900 000-00-00" autocomplete="tel" required>
+              <div class="field__err">Укажи телефон полностью</div>
+            </div>
+            <div class="field">
+              <label for="email">Электронная почта <span class="req">*</span></label>
+              <input type="email" id="email" name="email" placeholder="you@mail.ru" autocomplete="email" required>
+              <div class="field__err">Проверь адрес почты</div>
+              <div class="hint">На неё придёт подтверждение регистрации</div>
+            </div>
+          </div>
+
+          <div class="row2">
+            <div class="field">
+              <label for="city">Город <span class="req">*</span></label>
+              <input type="text" id="city" name="city" placeholder="Волгоград" required>
+              <div class="field__err">Укажи, откуда приедешь</div>
+            </div>
+            <div class="field">
+              <label for="telegram">Telegram</label>
+              <input type="text" id="telegram" name="telegram" placeholder="@username">
+              <div class="hint">Так нам будет проще связаться</div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="church">Церковь <span class="req">*</span></label>
+            <input type="text" id="church" name="church" placeholder="Название церкви и город">
+            <div class="field__err">Укажи церковь или отметь пункт ниже</div>
+            <label class="check" style="margin-top:12px">
+              <input type="checkbox" id="noChurch" name="noChurch">
+              <span>Я не посещаю церковь</span>
+            </label>
+          </div>
+
+          <div class="field">
+            <label>Нужна помощь с расселением <span class="req">*</span></label>
+            <div class="radio-row" style="padding-top:6px">
+              <label><input type="radio" name="housing" value="Не нужна" required> Не нужна</label>
+              <label><input type="radio" name="housing" value="Нужна"> Нужна</label>
+            </div>
+            <div class="field__err">Выбери вариант</div>
+            <div class="hint">Если нужна, мы свяжемся и подберём вариант</div>
+          </div>
+
+          <div class="field">
+            <label for="comment">Что-то важное для организаторов</label>
+            <textarea id="comment" name="comment" rows="3" placeholder="Необязательно"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn--lg" data-go="2">Далее</button>
+          </div>
+        </div>
+
+        <!-- ================= ШАГ 2: ПРОВЕРКА ================= -->
+        <div class="form-step" data-step="2">
+          <p class="dim" style="margin-top:0">
+            Проверь данные. На следующем шаге откроется защищённая страница оплаты.
+          </p>
+
+          <dl class="summary" id="summary"></dl>
+
+          <div style="margin-top:26px">
+            <label class="check">
+              <input type="checkbox" id="agreePd" name="agreePd" required>
+              <span>Даю согласие на обработку персональных данных на условиях
+                <a href="privacy.html" target="_blank" rel="noopener">политики обработки персональных данных</a></span>
+            </label>
+            <label class="check">
+              <input type="checkbox" id="agreeOffer" name="agreeOffer" required>
+              <span>Ознакомлен(а) с условиями
+                <a href="offer.html" target="_blank" rel="noopener">внесения добровольного пожертвования</a>
+                и правилами конференции</span>
+            </label>
+          </div>
+
+          <div class="field__err" id="agreeErr" style="display:none">
+            Отметь оба пункта, чтобы перейти к оплате
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn--ghost" data-go="1">Изменить</button>
+            <button type="button" class="btn btn--lg btn--shine" id="toPay">Перейти к оплате</button>
+          </div>
+
+          <p class="dim" style="font-size:13.5px;margin-top:18px">
+            Данные банковской карты вводятся на стороне платёжного сервиса
+            и на наш сайт не передаются.
+          </p>
+        </div>
+
+        <!-- ================= ШАГ 3: ГОТОВО (демо-режим) ================= -->
+        <div class="form-step" data-step="3">
+          <div class="done">
+            <div class="done__ic" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+                <path d="M4 12.5l5.5 5.5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <h2 class="h3">Ты в списке участников</h2>
+            <p class="dim" style="margin-top:12px">
+              Пожертвование получено, регистрация завершена. Сохрани свой номер
+              и назови его на стойке регистрации.
+            </p>
+            <div class="done__code" id="ticketCode">—</div>
+            <p class="dim" style="font-size:14px;margin-top:20px">
+              Ждём тебя 26 ноября, улица Руднева, 2д. Новости публикуем в
+              <a href="https://t.me/vkl_svet" class="green" target="_blank" rel="noopener">Telegram</a>.
+            </p>
+            <p style="margin-top:22px">
+              <a href="index.html" class="btn btn--ghost">На главную</a>
+            </p>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <p class="center dim" style="font-size:14px;margin-top:26px">
+      Не получается зарегистрироваться? Напиши
+      <a href="https://t.me/vkl_svet" class="green" target="_blank" rel="noopener">@vkl_svet</a>
+      или позвони <a href="tel:+79503254445" class="green">+7 950 325-44-45</a>
+    </p>
+
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script src="assets/js/register.js"></script>
+</body>
+</html>
