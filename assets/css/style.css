@@ -63,6 +63,8 @@
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
+  /* фиксированная шапка не должна накрывать заголовок при переходе по якорю */
+  scroll-padding-top: 96px;
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
