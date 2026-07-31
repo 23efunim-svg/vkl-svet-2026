@@ -54,12 +54,12 @@
   var heroTitle = $('.hero__title');
   if (heroTitle) { requestAnimationFrame(function () { heroTitle.classList.add('is-in'); }); }
 
-  /* --- Галерея: тянется мышью, листается пальцем --------------------------- */
+  /* --- Галерея: плавное движение при прокрутке + листание руками ----------- */
   $$('.gal-row').forEach(function (row) {
     var down = false, startX = 0, startScroll = 0, moved = 0;
 
     row.addEventListener('pointerdown', function (e) {
-      if (e.pointerType === 'touch') return;   // на телефоне работает родная прокрутка
+      if (e.pointerType === 'touch') return;   // пальцем работает родная прокрутка
       down = true; moved = 0;
       startX = e.clientX;
       startScroll = row.scrollLeft;
@@ -84,12 +84,10 @@
     row.addEventListener('pointercancel', stop);
     row.addEventListener('pointerleave', stop);
 
-    // после перетаскивания не открываем случайную ссылку
     row.addEventListener('click', function (e) {
       if (moved > 6) { e.preventDefault(); e.stopPropagation(); }
     }, true);
 
-    // колесо мыши прокручивает ленту вбок
     row.addEventListener('wheel', function (e) {
       if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
       var max = row.scrollWidth - row.clientWidth;
@@ -99,19 +97,45 @@
     }, { passive: false });
   });
 
+  // ленты разъезжаются навстречу друг другу по мере прокрутки страницы
+  var galRows = $$('.gal-row');
+  var gallery = $('.gallery');
+  if (galRows.length && gallery && !reduced) {
+    var gTicking = false;
+    var moveGallery = function () {
+      var rect = gallery.getBoundingClientRect();
+      var vh = window.innerHeight;
+      if (rect.bottom > -200 && rect.top < vh + 200) {
+        var progress = (vh / 2 - (rect.top + rect.height / 2)) / vh;
+        galRows.forEach(function (row) {
+          var track = row.querySelector('.gal-track');
+          if (!track) return;
+          var speed = parseFloat(row.dataset.speed || '0');
+          track.style.transform = 'translate3d(' + (progress * speed * window.innerWidth) + 'px,0,0)';
+        });
+      }
+      gTicking = false;
+    };
+    window.addEventListener('scroll', function () {
+      if (!gTicking) { gTicking = true; requestAnimationFrame(moveGallery); }
+    }, { passive: true });
+    moveGallery();
+  }
+
   /* --- Стих на фото: фон уезжает при прокрутке ----------------------------- */
-  var verseBg = $('.verse--photo .verse__bg');
-  var verseSec = $('.verse--photo');
-  if (verseBg && verseSec && !reduced) {
+  var verseSections = $$('.verse--photo');
+  if (verseSections.length && !reduced) {
     var vTicking = false;
     var moveVerse = function () {
-      var r = verseSec.getBoundingClientRect();
       var vh = window.innerHeight;
-      if (r.bottom > -100 && r.top < vh + 100) {
-        // -1 в начале экрана, +1 в конце
+      verseSections.forEach(function (sec) {
+        var bg = sec.querySelector('.verse__bg');
+        if (!bg) return;
+        var r = sec.getBoundingClientRect();
+        if (r.bottom < -100 || r.top > vh + 100) return;
         var p = (vh / 2 - (r.top + r.height / 2)) / (vh / 2 + r.height / 2);
-        verseBg.style.transform = 'translate3d(0,' + (p * 11).toFixed(2) + '%,0) scale(1.06)';
-      }
+        bg.style.transform = 'translate3d(0,' + (p * 11).toFixed(2) + '%,0) scale(1.06)';
+      });
       vTicking = false;
     };
     window.addEventListener('scroll', function () {
