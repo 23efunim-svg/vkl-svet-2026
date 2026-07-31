@@ -54,27 +54,70 @@
   var heroTitle = $('.hero__title');
   if (heroTitle) { requestAnimationFrame(function () { heroTitle.classList.add('is-in'); }); }
 
-  /* --- Параллакс галереи --------------------------------------------------- */
-  var galRows = $$('.gal-row');
-  var gallery = $('.gallery');
-  if (galRows.length && gallery && !reduced) {
-    var ticking = false;
-    var moveGallery = function () {
-      var rect = gallery.getBoundingClientRect();
+  /* --- Галерея: тянется мышью, листается пальцем --------------------------- */
+  $$('.gal-row').forEach(function (row) {
+    var down = false, startX = 0, startScroll = 0, moved = 0;
+
+    row.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'touch') return;   // на телефоне работает родная прокрутка
+      down = true; moved = 0;
+      startX = e.clientX;
+      startScroll = row.scrollLeft;
+      row.classList.add('is-dragging');
+      row.setPointerCapture(e.pointerId);
+    });
+
+    row.addEventListener('pointermove', function (e) {
+      if (!down) return;
+      var dx = e.clientX - startX;
+      moved = Math.abs(dx);
+      row.scrollLeft = startScroll - dx;
+    });
+
+    var stop = function (e) {
+      if (!down) return;
+      down = false;
+      row.classList.remove('is-dragging');
+      try { row.releasePointerCapture(e.pointerId); } catch (err) {}
+    };
+    row.addEventListener('pointerup', stop);
+    row.addEventListener('pointercancel', stop);
+    row.addEventListener('pointerleave', stop);
+
+    // после перетаскивания не открываем случайную ссылку
+    row.addEventListener('click', function (e) {
+      if (moved > 6) { e.preventDefault(); e.stopPropagation(); }
+    }, true);
+
+    // колесо мыши прокручивает ленту вбок
+    row.addEventListener('wheel', function (e) {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      var max = row.scrollWidth - row.clientWidth;
+      if ((row.scrollLeft <= 0 && e.deltaY < 0) || (row.scrollLeft >= max - 1 && e.deltaY > 0)) return;
+      e.preventDefault();
+      row.scrollLeft += e.deltaY;
+    }, { passive: false });
+  });
+
+  /* --- Стих на фото: фон уезжает при прокрутке ----------------------------- */
+  var verseBg = $('.verse--photo .verse__bg');
+  var verseSec = $('.verse--photo');
+  if (verseBg && verseSec && !reduced) {
+    var vTicking = false;
+    var moveVerse = function () {
+      var r = verseSec.getBoundingClientRect();
       var vh = window.innerHeight;
-      if (rect.bottom > -200 && rect.top < vh + 200) {
-        var progress = (vh / 2 - (rect.top + rect.height / 2)) / vh;
-        galRows.forEach(function (row) {
-          var speed = parseFloat(row.dataset.speed || '0');
-          row.style.transform = 'translate3d(' + (progress * speed * window.innerWidth) + 'px,0,0)';
-        });
+      if (r.bottom > -100 && r.top < vh + 100) {
+        // -1 в начале экрана, +1 в конце
+        var p = (vh / 2 - (r.top + r.height / 2)) / (vh / 2 + r.height / 2);
+        verseBg.style.transform = 'translate3d(0,' + (p * 11).toFixed(2) + '%,0) scale(1.06)';
       }
-      ticking = false;
+      vTicking = false;
     };
     window.addEventListener('scroll', function () {
-      if (!ticking) { ticking = true; requestAnimationFrame(moveGallery); }
+      if (!vTicking) { vTicking = true; requestAnimationFrame(moveVerse); }
     }, { passive: true });
-    moveGallery();
+    moveVerse();
   }
 
   /* --- Параллакс видео на первом экране ------------------------------------ */

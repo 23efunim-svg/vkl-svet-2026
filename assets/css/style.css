@@ -1718,3 +1718,137 @@ a.contact:hover .contact__v { color: var(--green); }
   .hero__date  { font-size: clamp(38px, 12vw, 60px); }
   .hero__place { font-size: clamp(26px, 8vw, 40px); }
 }
+
+/* ==========================================================================
+   Первый экран: правки по макету обложки
+   ========================================================================== */
+
+/* содержимое центрируем по вертикали, а не прижимаем к низу:
+   так локап не наезжает на меню, а датам хватает места снизу */
+.hero {
+  align-items: center;
+  padding-block: clamp(96px, 14vh, 150px) clamp(56px, 10vh, 110px);
+}
+.hero__in { text-align: left; }
+
+/* локап крупнее и с отступом от шапки */
+.hero__lockup {
+  width: min(100%, 940px);
+  margin: 0 auto clamp(34px, 6vh, 76px);
+}
+
+/* даты и город ниже локапа и заметно крупнее */
+.hero__meta {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: clamp(2px, 1vh, 10px);
+}
+.hero__date  { font-size: clamp(46px, 8.4vw, 128px); line-height: 1; }
+.hero__place { font-size: clamp(30px, 5vw, 76px); line-height: 1.05; }
+
+/* знак-печать возвращаем в правый верхний угол */
+.hero__mark {
+  display: block;
+  position: absolute;
+  z-index: 2;
+  top: clamp(86px, 12vh, 150px);
+  right: var(--gutter);
+  width: clamp(86px, 10vw, 150px);
+  height: auto;
+  opacity: .95;
+}
+
+@media (max-width: 760px) {
+  .hero { padding-block: 104px 40px; }
+  .hero__lockup { width: 100%; margin-bottom: 30px; }
+  .hero__mark { display: block; top: 80px; right: 16px; width: 62px; opacity: .85; }
+  .hero__date  { font-size: clamp(40px, 13vw, 66px); }
+  .hero__place { font-size: clamp(27px, 9vw, 46px); }
+}
+
+/* ==========================================================================
+   Галерея, стих и спикеры: правки по замечаниям
+   ========================================================================== */
+
+/* --- Галерея листается вручную на всех устройствах ------------------------ */
+.gallery { overflow: visible; }
+.gal-row {
+  width: auto;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  padding-inline: var(--gutter);
+  cursor: grab;
+  transform: none !important;   /* сдвигом управляет прокрутка, а не параллакс */
+}
+.gal-row::-webkit-scrollbar { display: none; }
+.gal-row.is-dragging { cursor: grabbing; scroll-behavior: auto; }
+.gal-row.is-dragging img { pointer-events: none; }
+.gal-row img { flex: none; }
+
+.gallery__hint { display: inline; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; }
+@media (max-width: 760px) {
+  .gal-row { scroll-snap-type: x mandatory; }
+  .gal-row img { scroll-snap-align: center; width: 78vw; }
+}
+
+/* --- Стих на фото: фон уезжает при прокрутке ------------------------------ */
+.verse--photo { overflow: hidden; }
+.verse--photo .verse__bg {
+  top: -14%;
+  height: 128%;
+  will-change: transform;
+}
+
+/* --- Спикеры: карточки-заглушки вместо пустой рамки ----------------------- */
+.soon {
+  display: grid;
+  grid-template-columns: 1.1fr .9fr;
+  gap: clamp(28px, 4vw, 60px);
+  align-items: center;
+  padding: clamp(28px, 4vw, 56px);
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(ellipse 70% 90% at 15% 50%, rgba(76,189,73,.10), transparent 65%),
+    var(--ink-2);
+}
+@media (max-width: 860px) { .soon { grid-template-columns: 1fr; gap: 30px; } }
+
+.soon__cards { display: flex; gap: clamp(10px, 1.4vw, 18px); }
+.soon__card {
+  flex: 1;
+  aspect-ratio: 3 / 4;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(160deg, rgba(232,223,206,.05), transparent 70%);
+  position: relative;
+  overflow: hidden;
+}
+.soon__card::after {
+  content: '?';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: clamp(24px, 3vw, 44px);
+  font-weight: 700;
+  color: rgba(232,223,206,.14);
+}
+/* карточки «дышат» по очереди */
+.soon__card { animation: soonPulse 4s ease-in-out infinite; }
+.soon__card:nth-child(2) { animation-delay: .5s; }
+.soon__card:nth-child(3) { animation-delay: 1s; }
+.soon__card:nth-child(4) { animation-delay: 1.5s; }
+@keyframes soonPulse {
+  0%, 100% { border-color: var(--line); }
+  50%      { border-color: rgba(76,189,73,.42); }
+}
+
+.soon__t { font-size: clamp(32px, 4.6vw, 68px); margin: 0 0 14px; }
+.soon__d { font-size: 16px; line-height: 1.6; margin: 0 0 24px; max-width: 34ch; }
+
+@media (max-width: 860px) {
+  .soon__cards { order: 2; }
+  .soon__body { order: 1; }
+}
