@@ -25,8 +25,8 @@
   font-weight: 700; font-style: italic; font-display: swap;
 }
 @font-face {
-  font-family: 'Marck';
-  src: url('../fonts/marckscript.woff2') format('woff2');
+  font-family: 'Alexandra';
+  src: url('../fonts/alexandra.woff2') format('woff2');
   font-weight: 400; font-style: normal; font-display: swap;
 }
 
@@ -122,7 +122,7 @@ h1, h2, h3, h4 {
 .h3 { font-size: clamp(21px, 2.2vw, 30px); }
 
 .script {
-  font-family: 'Marck', cursive;
+  font-family: 'Alexandra', 'Marck', cursive;
   font-weight: 400;
   font-style: normal;
   text-transform: none;
@@ -436,6 +436,9 @@ h1, h2, h3, h4 {
   padding-block: 15px;
   overflow: hidden;
   border-block: 1px solid rgba(22,21,15,.2);
+  /* по краям слова затухают: обрезанное слово больше не читается как опечатка */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
 }
 .ticker__row {
   display: flex;
@@ -461,7 +464,7 @@ h1, h2, h3, h4 {
   background: var(--ink);
   flex: none;
 }
-@keyframes tick { to { transform: translateX(-50%); } }
+@keyframes tick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
 .ticker--dark { background: var(--ink-2); color: var(--cream); border-color: var(--line); }
 .ticker--dark .ticker__row span::after { background: var(--green); }
@@ -1121,7 +1124,7 @@ a.contact:hover .contact__v { color: var(--green); }
 }
 .quote blockquote {
   margin: 0;
-  font-family: 'Marck', cursive;
+  font-family: 'Alexandra', 'Marck', cursive;
   font-size: clamp(21px, 2.4vw, 32px);
   line-height: 1.25;
   color: var(--yellow);
@@ -1526,4 +1529,192 @@ a.contact:hover .contact__v { color: var(--green); }
   .card:hover { background: var(--ink); }
   .gal-row img:hover { filter: contrast(1.03); transform: none; }
   .socials a:hover { transform: none; }
+}
+
+/* ==========================================================================
+   Вторая версия: структура по правкам команды от 31.07.2026
+   ========================================================================== */
+
+/* --- Первый экран: логотип-локап вместо набранного заголовка -------------- */
+.hero__lockup {
+  width: min(100%, 780px);
+  height: auto;
+  margin-bottom: clamp(18px, 3vh, 34px);
+  animation: lockIn 1.3s var(--ease) both;
+}
+@keyframes lockIn {
+  from { opacity: 0; transform: translateY(28px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+@media (max-width: 760px) {
+  .hero__lockup { width: 100%; margin-bottom: 14px; }
+}
+
+/* --- Стих на фото: рукописный, как в макете ------------------------------ */
+.verse--photo { padding-block: clamp(90px, 16vh, 190px); }
+.verse__script {
+  position: relative;
+  font-family: 'Alexandra', cursive;
+  font-size: clamp(30px, 5.4vw, 82px);
+  line-height: 1.16;
+  color: var(--yellow);
+  margin: 0;
+  text-transform: none;
+  font-weight: 400;
+  text-shadow: 0 2px 24px rgba(0,0,0,.45);
+}
+.verse__script .lit { color: var(--green-lt); }
+.verse--photo .verse__bg { opacity: .22; }
+
+/* --- Что тебя ждёт: список вместо карточек -------------------------------- */
+.waits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+.waits__i {
+  position: relative;
+  padding: clamp(14px, 1.8vw, 22px) 0 clamp(14px, 1.8vw, 22px) clamp(34px, 4vw, 62px);
+  border-top: 1px solid var(--line);
+  font-size: clamp(21px, 3.4vw, 44px);
+  font-weight: 700;
+  text-transform: uppercase;
+  line-height: 1.08;
+  letter-spacing: -.01em;
+  transition: color .45s var(--ease), padding-left .5s var(--ease);
+}
+.waits__i:last-child { border-bottom: 1px solid var(--line); }
+.waits__i::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: clamp(14px, 2vw, 26px);
+  height: 2px;
+  background: var(--green);
+  transform: translateY(-50%) scaleX(.35);
+  transform-origin: left;
+  transition: transform .5s var(--ease);
+}
+.waits__i:hover { color: var(--green); padding-left: clamp(44px, 5vw, 78px); }
+.waits__i:hover::before { transform: translateY(-50%) scaleX(1); }
+
+/* --- Адрес: строки не слипаются ------------------------------------------- */
+.place__addr { display: grid; gap: .3em; line-height: 1; }
+
+/* --- Финальный стих -------------------------------------------------------- */
+.final__verse {
+  font-size: clamp(26px, 4.4vw, 62px);
+  line-height: 1.18;
+  margin: 0 0 10px;
+}
+
+/* --- Вопросы: спокойнее, чем остальные секции ----------------------------- */
+.faq-section { background: var(--ink-2); border-top: 1px solid var(--line); }
+.faq-section .q__btn {
+  font-size: clamp(15px, 1.5vw, 18px);
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 19px 0;
+}
+.faq-section .q__body p { font-size: 15.5px; }
+
+/* --- Бегущая строка: ускоренный вариант для финала ------------------------ */
+.ticker--fast .ticker__row { animation-duration: 22s; }
+
+.gallery__hint { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; }
+@media (min-width: 761px) { .gallery__hint { display: none; } }
+
+/* --- Галерея: листается пальцем на телефоне ------------------------------- */
+@media (max-width: 760px) {
+  .gallery { overflow: visible; }
+  .gal-row {
+    width: auto;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-inline: var(--gutter);
+    transform: none !important;   /* параллакс не нужен, когда листают вручную */
+  }
+  .gal-row::-webkit-scrollbar { display: none; }
+  .gal-row img { scroll-snap-align: center; width: 78vw; flex: none; }
+}
+
+/* --- Сумма пожертвования в форме ------------------------------------------ */
+.donate {
+  margin-top: 26px;
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  background: rgba(76,189,73,.06);
+}
+.donate > label {
+  display: block;
+  font-size: 12px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+.donate__row { display: flex; align-items: center; gap: 12px; }
+.donate__row input {
+  width: 190px;
+  padding: 14px 16px;
+  background: rgba(232,223,206,.05);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--green);
+  font-family: inherit;
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: border-color .35s;
+}
+.donate__row input:focus { outline: none; border-color: var(--green); }
+.donate__cur { font-size: 26px; color: var(--green); font-weight: 700; }
+
+/* --- Что ждёт на конференции ----------------------------------------------- */
+.await {
+  margin-top: 22px;
+  padding: 20px 24px;
+  border-left: 2px solid var(--teal);
+  background: rgba(86,134,134,.08);
+}
+.await h3 {
+  font-size: 12px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin-bottom: 12px;
+}
+.await ul { margin: 0; padding-left: 18px; color: var(--cream); font-size: 15.5px; line-height: 1.7; }
+.await li::marker { color: var(--teal); }
+
+@media (max-width: 760px) {
+  .donate, .await { padding: 18px 18px; }
+  .donate__row input { width: 100%; font-size: 24px; }
+}
+
+/* --- Первый экран: правки после примерки нового шрифта -------------------- */
+.hero__lockup { width: min(100%, 880px); }
+
+/* Alexandra тоньше прежнего шрифта, поэтому крупнее и с подсветкой,
+   иначе на видео теряется */
+.hero__date {
+  font-size: clamp(40px, 7vw, 104px);
+  text-shadow: 0 2px 22px rgba(0,0,0,.5);
+}
+.hero__place {
+  font-size: clamp(28px, 4.2vw, 62px);
+  color: var(--cream);
+  text-shadow: 0 2px 22px rgba(0,0,0,.5);
+}
+.hero__meta { align-items: baseline; gap: clamp(18px, 3vw, 48px); }
+
+@media (max-width: 760px) {
+  .hero__date  { font-size: clamp(38px, 12vw, 60px); }
+  .hero__place { font-size: clamp(26px, 8vw, 40px); }
 }

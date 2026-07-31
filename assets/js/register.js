@@ -12,7 +12,7 @@
     // Yandex Cloud Function: российский хостинг обязателен,
     // Робокасса шлёт уведомления с российских IP
     API: '',                       // например https://functions.yandexcloud.net/d4xxxxxxxxxx
-    AMOUNT: 1000,
+    AMOUNT_MIN: 1000,
     CONF_DATE: '2026-11-26',
     MIN_AGE: 14,
     DRAFT_KEY: 'vkl2026_reg_draft'
@@ -165,10 +165,6 @@
     if (!noChurch.checked && church.value.trim().length < 2) { bad(church); }
     else { setErr(church, false); }
 
-    var housing = form.querySelector('input[name="housing"]:checked');
-    var housingField = form.querySelector('input[name="housing"]');
-    if (!housing) { bad(housingField); } else { setErr(housingField, false); }
-
     // несовершеннолетним нужны данные сопровождающего и отчество
     if (age !== null && age >= CONFIG.MIN_AGE && age < 18) {
       var gn = $('#guardianName'), gp = $('#guardianPhone'), pt = $('#patronymic');
@@ -192,7 +188,7 @@
       o[k] = typeof v === 'string' ? v.trim() : v;
     });
     if (noChurch.checked) o.church = 'Не посещает церковь';
-    o.amount = CONFIG.AMOUNT;
+    o.amount = currentAmount();
     o.age = ageOnConf(o.birthDate);
     o.filledInMs = Date.now() - startedAt;
     return o;
@@ -246,7 +242,6 @@
       ['Почта', d.email]
     ];
     if (d.telegram) rows.push(['Telegram', d.telegram]);
-    rows.push(['Помощь с расселением', d.housing]);
     if (d.guardianName) rows.push(['Сопровождающий', d.guardianName + ', ' + d.guardianPhone]);
 
     var html = rows.filter(function (r) { return r[1]; }).map(function (r) {
@@ -254,7 +249,7 @@
     }).join('');
 
     html += '<div class="summary__row summary__row--total"><dt>Добровольное пожертвование</dt>' +
-            '<dd>' + CONFIG.AMOUNT + ' <span class="rub">₽</span></dd></div>';
+            '<dd>' + currentAmount() + ' <span class="rub">₽</span></dd></div>';
 
     $('#summary').innerHTML = html;
   };
@@ -296,7 +291,6 @@
       setTimeout(function () {
         btn.disabled = false;
         btn.textContent = 'Перейти к оплате';
-        $('#ticketCode').textContent = makeCode(data);
         goStep(3);
         try { localStorage.removeItem(CONFIG.DRAFT_KEY); } catch (e) {}
       }, 900);
@@ -324,12 +318,33 @@
       });
   });
 
-  /* --- Номер участника для демонстрационного режима -------------------------- */
-  function makeCode(d) {
-    var base = (d.lastName || '') + (d.phone || '') + Date.now();
-    var h = 0;
-    for (var i = 0; i < base.length; i++) { h = (h * 31 + base.charCodeAt(i)) >>> 0; }
-    return 'ВС-' + String(h % 9000 + 1000);
+  /* --- Размер пожертвования ---------------------------------------------- */
+  function currentAmount() {
+    var el = $('#amount');
+    var v = el ? parseInt(String(el.value).replace(/\D/g, ''), 10) : NaN;
+    if (!v || v < CONFIG.AMOUNT_MIN) return CONFIG.AMOUNT_MIN;
+    return Math.min(v, 1000000);
+  }
+
+  var amountInput = $('#amount');
+  if (amountInput) {
+    amountInput.addEventListener('input', function () {
+      var digits = amountInput.value.replace(/\D/g, '').slice(0, 7);
+      amountInput.value = digits;
+    });
+    amountInput.addEventListener('blur', function () {
+      amountInput.value = currentAmount();
+      updateTotal();
+    });
+    amountInput.addEventListener('input', updateTotal);
+  }
+
+  // строка «итого» в сводке должна следовать за полем суммы
+  function updateTotal() {
+    var row = document.querySelector('.summary__row--total dd');
+    if (row) {
+      row.innerHTML = currentAmount() + ' <span class="rub">₽</span>';
+    }
   }
 
 })();
