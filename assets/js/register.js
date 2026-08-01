@@ -9,8 +9,7 @@
 
   /* --- Настройки ---------------------------------------------------------- */
   var CONFIG = {
-    // Yandex Cloud Function: российский хостинг обязателен,
-    // Робокасса шлёт уведомления с российских IP
+    // адрес функции Yandex Cloud, которая говорит с ЮKassa
     API: '',                       // например https://functions.yandexcloud.net/d4xxxxxxxxxx
     AMOUNT_MIN: 1000,
     CONF_DATE: '2026-11-26',
@@ -305,7 +304,10 @@
       .then(function (r) { return r.json(); })
       .then(function (res) {
         if (res && res.payUrl) {
-          try { localStorage.removeItem(CONFIG.DRAFT_KEY); } catch (e) {}
+          try {
+            localStorage.removeItem(CONFIG.DRAFT_KEY);
+            sessionStorage.setItem('vkl_payment_id', res.paymentId || '');
+          } catch (e) {}
           window.location.href = res.payUrl;
         } else {
           throw new Error('нет ссылки на оплату');

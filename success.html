@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#16150F">
 <link rel="icon" href="assets/logo/vkl-round.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/css/style.css?v=08011745">
+<link rel="stylesheet" href="assets/css/style.css?v=08011815">
 </head>
 <body>
 
@@ -89,7 +89,7 @@
   </div>
 </div>
 
-<script src="assets/js/app.js?v=08011745"></script>
+<script src="assets/js/app.js?v=08011815"></script>
 <script>
 (function () {
   'use strict';
@@ -99,7 +99,7 @@
   var DEMO = !API;
 
   var params = new URLSearchParams(location.search);
-  var invId = params.get('InvId') || params.get('inv') || '';
+  var paymentId = params.get('payment_id') || params.get('paymentId') || '';
 
   var show = function (id) {
     ['waiting', 'confirmed', 'done', 'pending'].forEach(function (k) {
@@ -111,7 +111,7 @@
   try { lastData = JSON.parse(sessionStorage.getItem('vkl_reg_last') || 'null'); } catch (e) {}
 
   var makeCode = function (d) {
-    var base = ((d && d.lastName) || '') + ((d && d.phone) || '') + (invId || '0');
+    var base = ((d && d.lastName) || '') + ((d && d.phone) || '') + (paymentId || '0');
     var h = 0;
     for (var i = 0; i < base.length; i++) { h = (h * 31 + base.charCodeAt(i)) >>> 0; }
     return 'ВС-' + String(h % 9000 + 1000);
@@ -146,13 +146,9 @@
 
     if (DEMO) { setTimeout(function () { after(makeCode(lastData)); }, 700); return; }
 
-    fetch(API + '/finish', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ invId: invId })
-    })
+    fetch(API + '/status?paymentId=' + encodeURIComponent(paymentId))
       .then(function (r) { return r.json(); })
-      .then(function (res) { after((res && res.ticket) || makeCode(lastData)); })
+      .then(function () { after(''); })
       .catch(function () {
         btn.disabled = false;
         btn.textContent = 'Завершить регистрацию';
@@ -164,7 +160,7 @@
   var check = function () {
     if (DEMO) { setTimeout(function () { show('confirmed'); }, 1200); return; }
 
-    fetch(API + '/status?InvId=' + encodeURIComponent(invId))
+    fetch(API + '/status?paymentId=' + encodeURIComponent(paymentId))
       .then(function (r) { return r.json(); })
       .then(function (res) {
         if (res && res.paid) { show('confirmed'); return; }
