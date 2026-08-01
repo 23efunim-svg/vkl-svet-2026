@@ -22,7 +22,7 @@
   var form = $('#regForm');
   if (!form) return;
 
-  var STEP_NAMES = { 1: 'Анкета участника', 2: 'Проверка и оплата', 3: 'Готово' };
+  var STEP_NAMES = { 1: 'Анкета участника', 2: 'Проверка данных', 3: 'Оплата и чек', 4: 'Готово' };
   var startedAt = Date.now();
 
   /* --- Переключение шагов -------------------------------------------------- */
@@ -282,43 +282,62 @@
 
     var btn = $('#toPay');
     btn.disabled = true;
-    btn.textContent = 'Готовим счёт...';
+    btn.textContent = 'Готовим...';
 
     try { sessionStorage.setItem('vkl_reg_last', JSON.stringify(data)); } catch (e) {}
 
-    if (CONFIG.DEMO) {
-      setTimeout(function () {
-        btn.disabled = false;
-        btn.textContent = 'Перейти к оплате';
-        goStep(3);
-        try { localStorage.removeItem(CONFIG.DRAFT_KEY); } catch (e) {}
-      }, 900);
-      return;
-    }
+    var showPay = function () {
+      btn.disabled = false;
+      btn.textContent = 'Перейти к оплате';
+      goStep(3);
+      try { localStorage.removeItem(CONFIG.DRAFT_KEY); } catch (e) {}
+    };
 
-    fetch(CONFIG.API + '/create-payment', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (res) {
-        if (res && res.payUrl) {
-          try {
-            localStorage.removeItem(CONFIG.DRAFT_KEY);
-            sessionStorage.setItem('vkl_payment_id', res.paymentId || '');
-          } catch (e) {}
-          window.location.href = res.payUrl;
-        } else {
-          throw new Error('нет ссылки на оплату');
-        }
-      })
-      .catch(function () {
-        btn.disabled = false;
-        btn.textContent = 'Перейти к оплате';
-        alert('Не получилось открыть страницу оплаты. Напиши нам в Telegram @vkl_svet, поможем вручную.');
-      });
+    // анкету отправляем сразу, чтобы у организаторов был список ожидающих оплату
+    if (CONFIG.API) {
+      fetch(CONFIG.API + '/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      }).then(showPay).catch(showPay);
+    } else {
+      setTimeout(showPay, 500);
+    }
   });
+
+  /* --- Копирование назначения платежа ------------------------------------- */
+  var copyBtn = $('#copyPurpose');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', function () {
+      var text = $('#purposeText').textContent.trim();
+      var done = function () {
+        copyBtn.textContent = 'скопировано';
+        setTimeout(function () { copyBtn.textContent = 'скопировать'; }, 2000);
+      };
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(done, done);
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta); done();
+      }
+    });
+  }
+
+  /* --- Ссылка на бота: подставляем имя, чтобы боту было проще сверить ------ */
+  var botLink = $('#botLink');
+  if (botLink) {
+    botLink.addEventListener('click', function () {
+      var d = null;
+      try { d = JSON.parse(sessionStorage.getItem('vkl_reg_last') || 'null'); } catch (e) {}
+      if (!d) return;
+      var payload = ((d.lastName || '') + '_' + (d.firstName || '')).replace(/[^A-Za-zА-Яа-яЁё0-9_]/g, '');
+      if (payload.length > 1) {
+        botLink.href = botLink.href.split('?')[0] + '?start=' + encodeURIComponent(payload.slice(0, 60));
+      }
+    });
+  }
 
   /* --- Размер пожертвования ---------------------------------------------- */
   function currentAmount() {
