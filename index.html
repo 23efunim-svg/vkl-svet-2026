@@ -16,7 +16,7 @@
 
 <link rel="preload" href="assets/fonts/europebold.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/alexandra.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/css/style.css?v=08012215">
+<link rel="stylesheet" href="assets/css/style.css?v=08012330">
 </head>
 <body>
 
@@ -45,8 +45,9 @@
 <!-- ============================ ПЕРВЫЙ ЭКРАН ============================ -->
 <section class="hero" id="top">
   <div class="hero__media">
-    <video autoplay muted loop playsinline preload="metadata"
-           poster="assets/video/hero-poster.jpg" id="heroVideo">
+    <video id="heroVideo" autoplay muted loop playsinline webkit-playsinline
+           preload="auto" disablepictureinpicture x5-playsinline
+           poster="assets/video/hero-poster.jpg">
       <source src="assets/video/hero-1080.mp4" type="video/mp4" media="(min-width: 900px)">
       <source src="assets/video/hero-720.mp4" type="video/mp4">
     </video>
@@ -112,7 +113,7 @@
 
 <!-- ============================ ЦЕНТРАЛЬНЫЙ СТИХ ============================ -->
 <section class="verse verse--photo">
-  <div class="verse__bg" style="background-image:url('assets/img/conf-05.webp')"></div>
+  <div class="verse__bg" style="background-image:url('assets/img/verse-1.webp')"></div>
   <div class="wrap rv">
     <blockquote class="verse__script mt0">
       Вы <span class="lit">свет</span> мира.<br>
@@ -274,7 +275,7 @@
 
 <!-- ============================ ФИНАЛЬНЫЙ СТИХ И ПРИЗЫВ ============================ -->
 <section class="verse verse--photo final">
-  <div class="verse__bg" style="background-image:url('assets/img/conf-09.webp')"></div>
+  <div class="verse__bg" style="background-image:url('assets/img/verse-2.webp')"></div>
   <div class="wrap center rv">
     <blockquote class="verse__script mt0">
       Слово Твоё <span class="lit">светильник</span> ноге моей<br>
@@ -428,6 +429,6 @@
   <a href="register.html" class="btn">Регистрация</a>
 </div>
 
-<script src="assets/js/app.js?v=08012215"></script>
+<script src="assets/js/app.js?v=08012330"></script>
 </body>
 </html>

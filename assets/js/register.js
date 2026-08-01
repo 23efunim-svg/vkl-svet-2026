@@ -293,16 +293,12 @@
       try { localStorage.removeItem(CONFIG.DRAFT_KEY); } catch (e) {}
     };
 
-    // анкету отправляем сразу, чтобы у организаторов был список ожидающих оплату
-    if (CONFIG.API) {
-      fetch(CONFIG.API + '/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      }).then(showPay).catch(showPay);
-    } else {
-      setTimeout(showPay, 500);
-    }
+    // анкета уходит в журнал на сервере до оплаты, чтобы ничего не терялось
+    fetch('save.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }).then(showPay).catch(showPay);
   });
 
   /* --- Копирование назначения платежа ------------------------------------- */
@@ -348,16 +344,40 @@
   }
 
   var amountInput = $('#amount');
+  var amountRange = $('#amountRange');
+
+  // закрашиваем пройденную часть дорожки ползунка
+  function paintRange() {
+    if (!amountRange) return;
+    var min = Number(amountRange.min), max = Number(amountRange.max);
+    var pct = ((Number(amountRange.value) - min) / (max - min)) * 100;
+    amountRange.style.setProperty('--fill', pct.toFixed(2) + '%');
+  }
+
   if (amountInput) {
     amountInput.addEventListener('input', function () {
-      var digits = amountInput.value.replace(/\D/g, '').slice(0, 7);
-      amountInput.value = digits;
+      amountInput.value = amountInput.value.replace(/\D/g, '').slice(0, 7);
+      if (amountRange) {
+        var v = Math.min(Math.max(Number(amountInput.value) || 0, 1000), 1000000);
+        amountRange.value = v;
+        paintRange();
+      }
+      updateTotal();
     });
     amountInput.addEventListener('blur', function () {
       amountInput.value = currentAmount();
+      if (amountRange) { amountRange.value = currentAmount(); paintRange(); }
       updateTotal();
     });
-    amountInput.addEventListener('input', updateTotal);
+  }
+
+  if (amountRange) {
+    amountRange.addEventListener('input', function () {
+      amountInput.value = amountRange.value;
+      paintRange();
+      updateTotal();
+    });
+    paintRange();
   }
 
   // строка «итого» в сводке должна следовать за полем суммы

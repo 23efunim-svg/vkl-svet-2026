@@ -152,20 +152,41 @@
     }, { passive: true });
   }
 
-  /* --- Видео: не крутим за пределами экрана и при экономии трафика --------- */
+  /* --- Видео на первом экране --------------------------------------------- */
   var heroVideo = $('#heroVideo');
   if (heroVideo) {
     var conn = navigator.connection || {};
+
+    var tryPlay = function () {
+      if (!heroVideo.paused) return;
+      heroVideo.muted = true;              // iOS пускает без звука только так
+      var p = heroVideo.play();
+      if (p && p.catch) { p.catch(function () {}); }
+    };
+
     if (conn.saveData || reduced) {
       heroVideo.removeAttribute('autoplay');
       heroVideo.pause();
-    } else if ('IntersectionObserver' in window) {
-      new IntersectionObserver(function (entries) {
-        entries.forEach(function (e) {
-          if (e.isIntersecting) { heroVideo.play().catch(function () {}); }
-          else { heroVideo.pause(); }
-        });
-      }, { threshold: 0.05 }).observe(heroVideo);
+    } else {
+      // iOS часто отказывает в автозапуске: пробуем на каждое подходящее событие
+      ['loadeddata', 'canplay', 'canplaythrough'].forEach(function (ev) {
+        heroVideo.addEventListener(ev, tryPlay);
+      });
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) tryPlay();
+      });
+      ['touchstart', 'pointerdown', 'click', 'scroll'].forEach(function (ev) {
+        window.addEventListener(ev, tryPlay, { once: true, passive: true });
+      });
+      tryPlay();
+
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            if (e.isIntersecting) { tryPlay(); } else { heroVideo.pause(); }
+          });
+        }, { threshold: 0.05 }).observe(heroVideo);
+      }
     }
   }
 

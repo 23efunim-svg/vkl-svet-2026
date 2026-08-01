@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#16150F">
 <link rel="icon" href="assets/logo/vkl-round.svg" type="image/svg+xml">
 <link rel="preload" href="assets/fonts/europebold.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/css/style.css?v=08012215">
+<link rel="stylesheet" href="assets/css/style.css?v=08012330">
 </head>
 <body>
 
@@ -153,6 +153,13 @@
                      aria-describedby="amountHint">
               <span class="donate__cur rub">₽</span>
             </div>
+            <input type="range" id="amountRange" class="donate__range"
+                   min="1000" max="1000000" step="500" value="1000"
+                   aria-label="Размер пожертвования">
+            <div class="donate__scale" aria-hidden="true">
+              <span>1 000 <span class="rub">₽</span></span>
+              <span>1 000 000 <span class="rub">₽</span></span>
+            </div>
             <div class="hint" id="amountHint">
               От 1000 <span class="rub">₽</span>. Можно внести больше, если есть желание
               поддержать конференцию.
@@ -221,7 +228,7 @@
             <div class="pay__bot">
               <h3>Как отправить чек</h3>
               <ol>
-                <li>Открой бота и нажми <b>Старт</b>.</li>
+                <li>Открой бота по кнопке ниже и нажми <b>Начать</b>. Если кнопки нет, открой <b>Меню</b> слева от поля ввода и выбери <b>«Начать регистрацию»</b>.</li>
                 <li>Отправь <b>одним сообщением</b>: свои фамилию и имя, а к нему приложи
                   фото или скриншот чека.</li>
               </ol>
@@ -277,7 +284,7 @@
   </div>
 </div>
 
-<script src="assets/js/app.js?v=08012215"></script>
-<script src="assets/js/register.js?v=08012215"></script>
+<script src="assets/js/app.js?v=08012330"></script>
+<script src="assets/js/register.js?v=08012330"></script>
 </body>
 </html>
