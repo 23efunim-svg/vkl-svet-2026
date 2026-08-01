@@ -87,14 +87,6 @@
     row.addEventListener('click', function (e) {
       if (moved > 6) { e.preventDefault(); e.stopPropagation(); }
     }, true);
-
-    row.addEventListener('wheel', function (e) {
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-      var max = row.scrollWidth - row.clientWidth;
-      if ((row.scrollLeft <= 0 && e.deltaY < 0) || (row.scrollLeft >= max - 1 && e.deltaY > 0)) return;
-      e.preventDefault();
-      row.scrollLeft += e.deltaY;
-    }, { passive: false });
   });
 
   // ленты разъезжаются навстречу друг другу по мере прокрутки страницы
