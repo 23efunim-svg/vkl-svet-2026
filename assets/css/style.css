@@ -2159,3 +2159,14 @@ a.contact:hover .contact__v { color: var(--green); }
 .pay__bot li { font-size: 15.5px; line-height: 1.55; color: var(--text-dim); }
 .pay__bot li b { color: var(--cream); }
 .pay__bot li::marker { color: var(--green); }
+
+/* --- Галерея: компактная высота ленты ------------------------------------- */
+.gal-track img {
+  height: clamp(300px, 34vh, 420px);
+  width: auto;
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+}
+@media (max-width: 760px) {
+  .gal-track img { height: 46vh; width: auto; }
+}
