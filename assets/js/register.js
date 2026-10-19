@@ -293,12 +293,19 @@
       try { localStorage.removeItem(CONFIG.DRAFT_KEY); } catch (e) {}
     };
 
-    // анкета уходит в журнал на сервере до оплаты, чтобы ничего не терялось
+    // анкета уходит в журнал на сервере до оплаты, чтобы ничего не терялось;
+    // в ответ приходит код анкеты для ссылки на бота
     fetch('save.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
-    }).then(showPay).catch(showPay);
+    }).then(function (r) { return r.json(); }).then(function (res) {
+      if (res && res.rid) {
+        try { sessionStorage.setItem('vkl_reg_rid', res.rid); } catch (e) {}
+        setBotLink(res.rid);
+      }
+      showPay();
+    }).catch(showPay);
   });
 
   /* --- Копирование назначения платежа ------------------------------------- */
@@ -321,19 +328,15 @@
     });
   }
 
-  /* --- Ссылка на бота: подставляем имя, чтобы боту было проще сверить ------ */
-  var botLink = $('#botLink');
-  if (botLink) {
-    botLink.addEventListener('click', function () {
-      var d = null;
-      try { d = JSON.parse(sessionStorage.getItem('vkl_reg_last') || 'null'); } catch (e) {}
-      if (!d) return;
-      var payload = ((d.lastName || '') + '_' + (d.firstName || '')).replace(/[^A-Za-zА-Яа-яЁё0-9_]/g, '');
-      if (payload.length > 1) {
-        botLink.href = botLink.href.split('?')[0] + '?start=' + encodeURIComponent(payload.slice(0, 60));
-      }
-    });
+  /* --- Ссылка на бота: код анкеты, по нему бот сразу находит человека ------ */
+  // Telegram принимает в start только латиницу, цифры, _ и -, поэтому имя туда не кладём
+  function setBotLink(rid) {
+    var link = $('#botLink');
+    if (link && /^r[a-z0-9]{6,16}$/.test(rid || '')) {
+      link.href = link.href.split('?')[0] + '?start=' + rid;
+    }
   }
+  try { setBotLink(sessionStorage.getItem('vkl_reg_rid')); } catch (e) {}
 
   /* --- Размер пожертвования ---------------------------------------------- */
   function currentAmount() {

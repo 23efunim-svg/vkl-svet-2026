@@ -30,7 +30,11 @@ function vkl_utf8_fix($v) {
 }
 $data = vkl_utf8_fix($data);
 
+// код анкеты: уходит в ссылку на бота, и бот сразу понимает, чей чек
+$rid = 'r' . substr(str_shuffle(str_repeat('abcdefghijkmnpqrstuvwxyz23456789', 3)), 0, 9);
+
 $row = [
+    'rid'       => $rid,
     'time'      => date('Y-m-d H:i:s'),
     'ip'        => $_SERVER['REMOTE_ADDR'] ?? '',
     'lastName'  => trim((string)($data['lastName'] ?? '')),
@@ -72,19 +76,29 @@ if ($ok === false) {
 // сразу отправляем анкету в Google-таблицу, чтобы она не зависела от внешних скриптов
 $sheetOk = false;
 try {
-    require_once __DIR__ . '/sheets.php';
+    define('VKL_BOOT', 1);
+    require_once __DIR__ . '/bot-lib.php';
     $sheetOk = vkl_sheet_append([
-        $row['time'], 'ожидает оплаты',
+        $row['time'], ST_WAIT,
         $row['lastName'], $row['firstName'], $row['patronymic'],
         $row['birthDate'], $row['age'], $row['gender'],
         $row['phone'], $row['email'], $row['city'], $row['church'], $row['telegram'],
         $row['guardianName'], $row['guardianPhone'], $row['comment'], $row['amount'],
-        $row['time'] . '|' . $row['phone'],
+        $row['time'] . '|' . $row['phone'], '', $rid, '', '',
     ]);
 } catch (Throwable $e) {
     @file_put_contents($dir . '/sheets-errors.log',
-        date('Y-m-d H:i:s') . ' ' . $e->getMessage() . "
-", FILE_APPEND);
+        date('Y-m-d H:i:s') . ' ' . $e->getMessage() . "\n", FILE_APPEND);
 }
 
-echo json_encode(['ok' => true, 'sheet' => $sheetOk], JSON_UNESCAPED_UNICODE);
+echo json_encode(['ok' => true, 'sheet' => $sheetOk, 'rid' => $rid], JSON_UNESCAPED_UNICODE);
+
+// человек уже получил ответ; заодно проверяем, что бот на связи (не чаще раза в 10 минут)
+if (function_exists('fastcgi_finish_request')) { fastcgi_finish_request(); }
+try {
+    if (function_exists('vkl_watchdog')) {
+        vkl_watchdog();
+        if (!$sheetOk) { vkl_alert('❗ <b>Сайт:</b> анкета ' . htmlspecialchars($row['lastName'] . ' ' . $row['firstName'])
+            . ' не записалась в таблицу. Она сохранена в журнале на сервере.'); }
+    }
+} catch (Throwable $e) {}

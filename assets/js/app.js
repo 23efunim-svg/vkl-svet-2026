@@ -4,6 +4,15 @@
 (function () {
   'use strict';
 
+  // копия на GitHub Pages не умеет сохранять анкеты — ведём на основной сайт
+  if (/github\.io$/.test(location.hostname)) {
+    location.replace('https://xn----ctbbkconi1dhf6c4e.xn--p1ai/' +
+      location.pathname.replace(/^\/vkl-svet-2026\/?/, '') + location.search + location.hash);
+    return;
+  }
+
+  document.body.classList.add('js');
+
   var $  = function (s, c) { return (c || document).querySelector(s); };
   var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -187,6 +196,49 @@
           });
         }, { threshold: 0.05 }).observe(heroVideo);
       }
+    }
+  }
+
+  /* --- Видеокружок Карена ------------------------------------------------ */
+  var speakerNote = $('[data-speaker-note]');
+  if (speakerNote) {
+    var noteVideo = $('.speaker-note__video', speakerNote);
+    var noteToggle = $('.speaker-note__toggle', speakerNote);
+    var noteLabel = $('span', noteToggle);
+
+    if (reduced) {
+      noteVideo.removeAttribute('autoplay');
+      noteVideo.pause();
+    } else {
+      var notePlay = noteVideo.play();
+      if (notePlay && notePlay.catch) { notePlay.catch(function () {}); }
+    }
+
+    noteToggle.addEventListener('click', function () {
+      if (noteVideo.paused) {
+        var play = noteVideo.play();
+        if (play && play.catch) { play.catch(function () {}); }
+      }
+      noteVideo.muted = !noteVideo.muted;
+      var soundOn = !noteVideo.muted;
+      speakerNote.classList.toggle('is-sound', soundOn);
+      noteToggle.setAttribute('aria-label', soundOn ? 'Выключить звук видеокружка' : 'Включить звук видеокружка');
+      noteLabel.textContent = soundOn ? 'выкл. звук' : 'вкл. звук';
+    });
+
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) {
+            if (!reduced) {
+              var play = noteVideo.play();
+              if (play && play.catch) { play.catch(function () {}); }
+            }
+          } else {
+            noteVideo.pause();
+          }
+        });
+      }, { threshold: .2 }).observe(speakerNote);
     }
   }
 

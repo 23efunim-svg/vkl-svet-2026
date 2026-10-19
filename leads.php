@@ -1,13 +1,8 @@
 <?php
-/** Просмотр журнала анкет. Доступ по логину и паролю. */
-$USER = 'vkl';
-$PASS = 'svet-2026';
-
-if (!isset($_SERVER['PHP_AUTH_USER']) || $_SERVER['PHP_AUTH_USER'] !== $USER || $_SERVER['PHP_AUTH_PW'] !== $PASS) {
-    header('WWW-Authenticate: Basic realm="Журнал анкет"');
-    http_response_code(401);
-    exit('Нужен доступ');
-}
+/** Просмотр журнала анкет. Логин и пароль — в secrets/panel-auth.txt вне папки сайта. */
+define('VKL_BOOT', 1);
+require __DIR__ . '/bot-lib.php';
+vkl_require_auth('Журнал анкет');
 
 $dir = dirname(__DIR__) . '/leads';
 $files = glob($dir . '/leads-*.jsonl') ?: [];

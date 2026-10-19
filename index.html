@@ -15,8 +15,8 @@
 <meta property="og:locale" content="ru_RU">
 
 <link rel="preload" href="assets/fonts/europebold.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="assets/fonts/alexandra.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/css/style.css?v=08012330">
+<link rel="preload" href="assets/fonts/betmo-rus.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/style.css?v=1014betmo">
 </head>
 <body>
 
@@ -160,20 +160,71 @@
       <h2 class="h2">Спикеры</h2>
     </div>
 
-    <div class="soon rv">
-      <div class="soon__cards" aria-hidden="true">
-        <span class="soon__card"></span>
-        <span class="soon__card"></span>
-        <span class="soon__card"></span>
-        <span class="soon__card"></span>
-      </div>
-      <div class="soon__body">
-        <p class="script soon__t">скоро объявим</p>
-        <p class="dim soon__d">
-          Имена спикеров публикуем в Telegram-канале. Подпишись, чтобы узнать первым.
-        </p>
-        <a href="https://t.me/vkl_svet" class="btn" target="_blank" rel="noopener">Telegram-канал</a>
-      </div>
+    <div class="speakers-grid">
+      <article class="speaker speaker--karen rv">
+        <figure class="speaker__media">
+          <img src="assets/img/speakers/karen-karagyan.webp" alt="Карен Карагян" width="900" height="1200" loading="lazy" decoding="async">
+          <div class="speaker-note" data-speaker-note>
+            <video class="speaker-note__video" muted loop playsinline autoplay preload="metadata" poster="assets/img/speakers/karen-karagyan.webp" aria-label="Видеокружок Карена Карагяна">
+              <source src="assets/video/karen-note.mp4" type="video/mp4">
+            </video>
+            <button class="speaker-note__toggle" type="button" aria-label="Включить звук видеокружка">
+              <span>вкл. звук</span>
+            </button>
+          </div>
+        </figure>
+        <div class="speaker__body">
+          <span class="speaker__num" aria-hidden="true">01</span>
+          <h3 class="speaker__name">Карен Карагян</h3>
+          <p class="speaker__role">Лидер молодёжной команды прославления церкви «Слово жизни», г. Москва. Автор песен прославления и книг</p>
+        </div>
+      </article>
+
+      <article class="speaker rv" data-d="1">
+        <figure class="speaker__media">
+          <img src="assets/img/speakers/mikhail-moskotin.webp" alt="Михаил Москотин" width="900" height="1200" loading="lazy" decoding="async">
+        </figure>
+        <div class="speaker__body">
+          <span class="speaker__num" aria-hidden="true">02</span>
+          <h3 class="speaker__name">Михаил Москотин</h3>
+          <p class="speaker__role">Бизнес-тренер, коуч, психолог, автор бизнес-тренингов и семинаров, служитель церкви «Слово жизни»</p>
+        </div>
+      </article>
+
+      <article class="speaker rv" data-d="2">
+        <figure class="speaker__media">
+          <img src="assets/img/speakers/simon-milongo.webp" alt="Симон Милонго" width="900" height="1198" loading="lazy" decoding="async">
+        </figure>
+        <div class="speaker__body">
+          <span class="speaker__num" aria-hidden="true">03</span>
+          <h3 class="speaker__name">Симон Милонго</h3>
+          <p class="speaker__role">Епископ, учитель, пастор церкви «Благодать Иисуса Христа», г. Волгоград</p>
+        </div>
+      </article>
+
+      <article class="speaker speaker--pastors rv" data-d="1">
+        <figure class="speaker__media">
+          <img src="assets/img/speakers/alexander-tatyana-karpovy.webp" alt="Александр и Татьяна Карповы" width="900" height="1200" loading="lazy" decoding="async">
+        </figure>
+        <div class="speaker__body">
+          <span class="speaker__num" aria-hidden="true">04</span>
+          <h3 class="speaker__name">Александр и Татьяна Карповы</h3>
+          <p class="speaker__role">Пасторы церкви «Благодать Иисуса Христа», г. Волгоград</p>
+        </div>
+      </article>
+
+      <article class="speaker speaker--mission rv" data-d="2">
+        <figure class="speaker__media">
+          <img src="assets/img/speakers/gosti-missii.webp" alt="Гости Миссии" width="900" height="936" loading="lazy" decoding="async">
+        </figure>
+        <div class="speaker__body">
+          <span class="speaker__num" aria-hidden="true">05</span>
+          <h3 class="speaker__name">Гости Миссии</h3>
+          <p class="speaker__role">Миссия переводчиков Библии «Уиклиф»</p>
+          <p class="speaker__text"><strong>Наше видение:</strong> преображение жизни людей через Слово Божье на родном языке в России и за её пределами.</p>
+          <p class="speaker__text">Мы принимаем участие в проектах, связанных с переводом и распространением Библии в разных уголках планеты. Вместе с церквями служение распространяется среди малых и недостигнутых Евангелием народов.</p>
+        </div>
+      </article>
     </div>
   </div>
 </section>
@@ -429,6 +480,6 @@
   <a href="register.html" class="btn">Регистрация</a>
 </div>
 
-<script src="assets/js/app.js?v=08012330"></script>
+<script src="assets/js/app.js?v=10192345"></script>
 </body>
 </html>
