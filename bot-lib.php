@@ -186,11 +186,40 @@ function vkl_pretty($tokens) {
 
 /* ------------------------------------------------------------- Таблица */
 
-/** Ключ человека: телефон + фамилия + имя. По нему склеиваются повторные анкеты. */
-function vkl_person_key($r) {
-    $phone = vkl_phone10($r[COL_PHONE] ?? '');
-    $name = vkl_norm($r[COL_LAST] ?? '') . '|' . vkl_norm($r[COL_FIRST] ?? '');
-    return ($phone !== '' ? $phone : vkl_norm($r[COL_BIRTH] ?? '')) . '|' . $name;
+/**
+ * Один ли это человек: те же фамилия и имя плюс совпадает телефон, дата рождения или почта.
+ * Одного телефона мало: люди ошибаются в цифре при повторной анкете.
+ */
+function vkl_same_person($a, $b) {
+    $last = vkl_norm($a[COL_LAST] ?? '');
+    if ($last === '' || $last !== vkl_norm($b[COL_LAST] ?? '')
+        || vkl_norm($a[COL_FIRST] ?? '') !== vkl_norm($b[COL_FIRST] ?? '')) { return false; }
+    $checks = [
+        [COL_PHONE, 'vkl_phone10'],
+        [COL_BIRTH, 'trim'],
+        [COL_EMAIL, function ($v) { return mb_strtolower(trim($v)); }],
+    ];
+    foreach ($checks as list($col, $fn)) {
+        $x = $fn((string)($a[$col] ?? ''));
+        if ($x !== '' && $x === $fn((string)($b[$col] ?? ''))) { return true; }
+    }
+    return false;
+}
+
+/** Все анкеты того же человека, включая $idx (по цепочке совпадений). Индексы по возрастанию. */
+function vkl_person_group($rows, $idx) {
+    $in = [$idx => true];
+    $queue = [$idx];
+    while ($queue) {
+        $k = array_pop($queue);
+        for ($i = 1; $i < count($rows); $i++) {
+            if (isset($in[$i]) || vkl_is_service_row($rows[$i])) { continue; }
+            if (vkl_same_person($rows[$k], $rows[$i])) { $in[$i] = true; $queue[] = $i; }
+        }
+    }
+    $group = array_keys($in);
+    sort($group);
+    return $group;
 }
 
 function vkl_status_rank($s) {
@@ -249,12 +278,7 @@ function vkl_find_row($rows, $rid, $tokens, $username) {
  * актуальной считается самая свежая. Возвращает описание для организаторов.
  */
 function vkl_mark_paid($rows, $idx, $file, $tgId, $username) {
-    $key = vkl_person_key($rows[$idx]);
-    $group = [];
-    foreach ($rows as $i => $r) {
-        if ($i >= 1 && !vkl_is_service_row($r) && vkl_person_key($r) === $key) { $group[] = $i; }
-    }
-    if (!$group) { $group = [$idx]; }
+    $group = vkl_person_group($rows, $idx);
     $main = max($group);
     $best = ST_RECEIPT;
     foreach ($group as $i) {
