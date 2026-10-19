@@ -408,6 +408,19 @@ function vkl_bot_handle($u) {
         $kind = 'document';
     }
 
+    // ответ на своё старое сообщение с чеком («.», «вот», имя — что угодно): берём чек оттуда
+    $quoted = $m['reply_to_message'] ?? null;
+    if ($fileId === '' && $quoted && empty($quoted['from']['is_bot'])) {
+        if (!empty($quoted['photo'])) {
+            $fileId = end($quoted['photo'])['file_id'];
+            $kind = 'photo';
+        } elseif (!empty($quoted['document'])) {
+            $fileId = $quoted['document']['file_id'];
+            $kind = 'document';
+        }
+        if ($fileId !== '') { $caption = $text; }
+    }
+
     // остальные фото из того же альбома прикладываем к тому же человеку молча
     $group = (string)($m['media_group_id'] ?? '');
     if ($fileId !== '' && $group !== '' && ($e['group'] ?? '') === $group) {
