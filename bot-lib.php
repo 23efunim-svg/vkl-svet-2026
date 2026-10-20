@@ -305,7 +305,14 @@ function vkl_is_paid($status) {
 
 function vkl_amount($v) {
     $n = (int)preg_replace('/\D+/', '', (string)$v);
-    return $n > 0 ? $n : 1000;
+    return $n > 0 ? $n : VKL_RECOMMENDED;
+}
+
+/** Сколько ждём от человека: организатор — ничего, служитель — половину рекомендуемого, участник — сумму из анкеты. */
+function vkl_expected($role, $declared) {
+    if ($role === ROLE_ORG) { return 0; }
+    if ($role === ROLE_SERV) { return (int)round(VKL_RECOMMENDED * VKL_SERV_SHARE); }
+    return $declared;
 }
 
 function vkl_ucfirst($s) {
@@ -386,8 +393,23 @@ function vkl_participants($rows) {
         }
         $first = min(array_map(function ($k) use ($rows) { return $rows[$k][COL_TIME] ?? ''; }, $g));
         $r = $rows[$main];
-        $list[] = ['first' => $first, 'row' => $main + 1, 'status' => $status, 'r' => $r,
-                   'forms' => count($g), 'paid' => vkl_is_paid($status), 'amount' => vkl_amount($r[COL_AMOUNT] ?? '')];
+
+        // категорию и полученную сумму ставит человек вручную — берём из свежей анкеты, иначе из любой
+        $role = ''; $got = 0;
+        foreach (array_merge([$main], $alive) as $k) {
+            if ($role === '') { $role = trim($rows[$k][COL_ROLE] ?? ''); }
+            if ($got === 0) { $got = (int)preg_replace('/\D+/', '', (string)($rows[$k][COL_GOT] ?? '')); }
+        }
+        $role = in_array($role, [ROLE_SERV, ROLE_ORG], true) ? $role : ROLE_PART;
+        $declared = vkl_amount($r[COL_AMOUNT] ?? '');
+        $expected = vkl_expected($role, $declared);
+        $paid = vkl_is_paid($status) || $got > 0;
+        $state = $paid ? 'paid' : ($expected > 0 ? 'wait' : 'free');
+        $amount = $paid ? ($got > 0 ? $got : ($role === ROLE_SERV ? $expected : $declared)) : $expected;
+
+        $list[] = ['first' => $first, 'row' => $main + 1, 'status' => $status, 'r' => $r, 'forms' => count($g),
+                   'paid' => $paid, 'state' => $state, 'role' => $role, 'declared' => $declared, 'got' => $got,
+                   'amount' => $amount];
     }
     usort($list, function ($a, $b) { return strcmp($a['first'], $b['first']) ?: $a['row'] - $b['row']; });
 
@@ -735,12 +757,14 @@ function vkl_admin_command($chat, $cmd, $arg) {
     $rows = vkl_sheet_rows();
     if ($rows === null) { tg_say($chat, 'Таблица сейчас недоступна.'); return; }
     $people = vkl_participants($rows);
-    $paid = array_filter($people, function ($p) { return $p['paid']; });
+    $paid = array_filter($people, function ($p) { return $p['state'] === 'paid'; });
     $sum = function ($ps) { return number_format(array_sum(array_column($ps, 'amount')), 0, '', ' '); };
-    $wait = array_filter($people, function ($p) { return !$p['paid']; });
+    $wait = array_filter($people, function ($p) { return $p['state'] === 'wait'; });
+    $free = array_filter($people, function ($p) { return $p['state'] === 'free'; });
     $lines = ['📊 <b>Участники</b>: ' . count($people) . ' (без дублей и тестов)',
               '✅ оплачено: ' . count($paid) . ' — ' . $sum($paid) . ' ₽',
               '⏳ ожидают: ' . count($wait) . ' — ' . $sum($wait) . ' ₽',
+              '🙌 организаторы без оплаты: ' . count($free),
               '<a href="' . VKL_SITE . '/leads.php">Список участников</a> · <a href="' . VKL_SHEET_URL . '">Таблица</a>'];
     tg_say($chat, implode("\n", $lines));
 }

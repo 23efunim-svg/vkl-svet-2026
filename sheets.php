@@ -7,7 +7,7 @@
 define('VKL_SHEET_ID', '1guyrmCKxsNvMBnL_NxHemu0UDiuO1Su821D2vNy6nQk');
 define('VKL_SHEET_NAME', 'Участники');
 define('VKL_SHEET_GID', 0);
-define('VKL_SHEET_LAST_COL', 'V');
+define('VKL_SHEET_LAST_COL', 'X');
 define('VKL_SA_FILE', dirname(__DIR__) . '/secrets/google-sa.json');
 
 // столбцы листа (с нуля)
@@ -16,13 +16,20 @@ define('COL_PATR', 4);   define('COL_BIRTH', 5);  define('COL_AGE', 6);   define
 define('COL_PHONE', 8);  define('COL_EMAIL', 9);  define('COL_CITY', 10); define('COL_CHURCH', 11);
 define('COL_TG', 12);    define('COL_GNAME', 13); define('COL_GPHONE', 14); define('COL_COMMENT', 15);
 define('COL_AMOUNT', 16); define('COL_KEY', 17);  define('COL_RECEIPT', 18); define('COL_RID', 19);
-define('COL_TGID', 20);  define('COL_RTIME', 21);
+define('COL_TGID', 20);  define('COL_RTIME', 21); define('COL_ROLE', 22); define('COL_GOT', 23);
 
 define('VKL_HEADERS', json_encode([
     'Дата регистрации', 'Статус', 'Фамилия', 'Имя', 'Отчество', 'Дата рождения', 'Лет', 'Пол',
     'Телефон', 'Почта', 'Город', 'Церковь', 'Telegram', 'Сопровождающий', 'Телефон сопровождающего',
-    'Вопрос', 'Сумма', 'Ключ', 'Чек', 'Код анкеты', 'Telegram ID', 'Чек пришёл',
+    'Вопрос', 'Сумма', 'Ключ', 'Чек', 'Код анкеты', 'Telegram ID', 'Чек пришёл', 'Категория', 'Получено, ₽',
 ], JSON_UNESCAPED_UNICODE));
+
+// категории людей: организаторам платить не нужно, служителям — половину рекомендуемого
+define('ROLE_PART', 'участник');
+define('ROLE_SERV', 'служитель');
+define('ROLE_ORG', 'организатор');
+define('VKL_RECOMMENDED', 1000);
+define('VKL_SERV_SHARE', 0.5);
 
 // статусы
 define('ST_WAIT', 'ожидает оплаты');
