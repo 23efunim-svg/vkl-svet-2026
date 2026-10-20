@@ -273,6 +273,19 @@ function vkl_find_row($rows, $rid, $tokens, $username) {
     return -1;
 }
 
+/** Все анкеты, у которых и фамилия, и имя есть среди слов сообщения. */
+function vkl_find_all_rows($rows, $tokens) {
+    $set = array_flip($tokens);
+    $hits = [];
+    for ($i = 1; $i < count($rows); $i++) {
+        if (vkl_is_service_row($rows[$i])) { continue; }
+        $last = vkl_norm($rows[$i][COL_LAST] ?? '');
+        $first = vkl_norm($rows[$i][COL_FIRST] ?? '');
+        if ($last !== '' && $first !== '' && isset($set[$last]) && isset($set[$first])) { $hits[] = $i; }
+    }
+    return $hits;
+}
+
 /**
  * Отмечаем чек у человека. Повторные анкеты того же человека помечаются «дубль»,
  * актуальной считается самая свежая. Возвращает описание для организаторов.
@@ -484,6 +497,18 @@ function vkl_bot_handle($u) {
         $note = $res['ok']
             ? 'анкета найдена, строка ' . $res['row'] . ' → «' . $res['status'] . '»' . ($res['dups'] ? ', повторных анкет: ' . $res['dups'] : '')
             : '❗ анкета найдена (строка ' . $res['row'] . '), но запись в таблицу не прошла';
+
+        // один чек за нескольких («Мамаджонов Данияр, Мамаджонов Далер»): отмечаем каждого названного
+        if (count($nameTokens) >= 3) {
+            $covered = vkl_person_group($rows, $idx);
+            foreach (vkl_find_all_rows($rows, $nameTokens) as $j) {
+                if (in_array($j, $covered, true)) { continue; }
+                $covered = array_merge($covered, vkl_person_group($rows, $j));
+                $more = vkl_mark_paid($rows, $j, $mainFile, $uid, $uname);
+                $who .= '; ' . trim(($rows[$j][COL_LAST] ?? '') . ' ' . ($rows[$j][COL_FIRST] ?? ''));
+                $note .= '; также строка ' . $more['row'] . ($more['ok'] ? ' → «' . $more['status'] . '»' : ' ❗ не записалась');
+            }
+        }
     } else {
         $p = $nameTokens;
         $ok = vkl_sheet_append([date('Y-m-d H:i:s'), ST_NOFORM, vkl_pretty([$p[0]]), vkl_pretty([$p[1] ?? '']), vkl_pretty([$p[2] ?? '']),
