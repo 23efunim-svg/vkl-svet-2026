@@ -273,6 +273,17 @@ function vkl_find_row($rows, $rid, $tokens, $username) {
     return -1;
 }
 
+/**
+ * Статус неоплаченной строки следует за категорией: организатор → «не требуется», остальные → «ожидает оплаты».
+ * Возвращает ячейки для записи. Оплаченные, дубли и тесты не трогает.
+ */
+function vkl_role_status_cells($rowNum, $status, $role) {
+    $status = trim((string)$status);
+    if ($status !== '' && $status !== ST_WAIT && $status !== ST_FREE) { return []; }
+    $want = $role === ROLE_ORG ? ST_FREE : ST_WAIT;
+    return $status === $want ? [] : ['B' . $rowNum => $want];
+}
+
 /** Анкеты, сгруппированные по людям: [[индексы строк], ...]. Тестовые строки не входят. */
 function vkl_people_groups($rows) {
     $parent = [];
@@ -400,6 +411,7 @@ function vkl_participants($rows) {
             if ($role === '') { $role = trim($rows[$k][COL_ROLE] ?? ''); }
             if ($got === 0) { $got = (int)preg_replace('/\D+/', '', (string)($rows[$k][COL_GOT] ?? '')); }
         }
+        if ($role === '' && $status === ST_FREE) { $role = ROLE_ORG; }   // в таблице выбрали статус «не требуется»
         $role = in_array($role, [ROLE_SERV, ROLE_ORG], true) ? $role : ROLE_PART;
         $declared = vkl_amount($r[COL_AMOUNT] ?? '');
         $expected = vkl_expected($role, $declared);

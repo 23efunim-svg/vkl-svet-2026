@@ -37,6 +37,7 @@ define('ST_RECEIPT', 'чек получен');
 define('ST_PAID', 'оплачено');
 define('ST_NOFORM', 'чек без анкеты');
 define('ST_DUP', 'дубль');
+define('ST_FREE', 'не требуется');     // организатор без оплаты; синхронно с категорией в столбце W
 define('ST_TEST', 'тест');
 
 function vkl_b64url($s) {

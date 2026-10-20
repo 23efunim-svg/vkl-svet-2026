@@ -11,8 +11,8 @@ vkl_require_auth('Участники');
 
 define('VKL_SHEET_CACHE', VKL_LEADS . '/sheet-cache.json');
 
-/** Таблица с кэшем на минуту, чтобы не дёргать Google на каждое обновление страницы. */
-function vkl_rows_cached($ttl = 60) {
+/** Таблица с коротким кэшем: правки в Google-таблице видны здесь через несколько секунд. */
+function vkl_rows_cached($ttl = 10) {
     $c = vkl_json_load(VKL_SHEET_CACHE);
     if (isset($c['at'], $c['rows']) && time() - $c['at'] < $ttl && !isset($_GET['fresh'])) { return [$c['rows'], $c['at']]; }
     $rows = vkl_sheet_rows();
@@ -32,7 +32,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_GET['action'] ?? '') ===
         || $rows === null || $row < 2 || $row > count($rows) || vkl_is_service_row($rows[$row - 1])) {
         http_response_code(400); echo '{"ok":false}'; exit;
     }
-    $ok = vkl_sheet_set_cells(['W' . $row => $role]);
+    $cells = ['W' . $row => $role] + vkl_role_status_cells($row, $rows[$row - 1][COL_STATUS] ?? '', $role);
+    $ok = vkl_sheet_set_cells($cells);
     @unlink(VKL_SHEET_CACHE);
     if ($ok) { vkl_log('bot.log', 'вручную: строка ' . $row . ' (' . trim(($rows[$row - 1][COL_LAST] ?? '') . ' ' . ($rows[$row - 1][COL_FIRST] ?? '')) . ') → категория «' . $role . '»'); }
     echo json_encode(['ok' => $ok]);
