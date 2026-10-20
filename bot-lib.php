@@ -326,11 +326,21 @@ function vkl_lev($a, $b) {
     return end($prev);
 }
 
-/** Город для фильтра: без «г.», без области после запятой, регистр не важен. */
+/** Латиница → кириллица для названий городов («Volgograd» → «волгоград»). */
+function vkl_translit_ru($s) {
+    return strtr($s, ['shch' => 'щ', 'sch' => 'щ', 'zh' => 'ж', 'kh' => 'х', 'ts' => 'ц', 'ch' => 'ч', 'sh' => 'ш',
+        'yu' => 'ю', 'ya' => 'я', 'yo' => 'е', 'iy' => 'ий', 'yy' => 'ый', 'a' => 'а', 'b' => 'б', 'v' => 'в',
+        'g' => 'г', 'd' => 'д', 'e' => 'е', 'z' => 'з', 'i' => 'и', 'y' => 'ы', 'k' => 'к', 'l' => 'л', 'm' => 'м',
+        'n' => 'н', 'o' => 'о', 'p' => 'п', 'r' => 'р', 's' => 'с', 't' => 'т', 'u' => 'у', 'f' => 'ф', 'h' => 'х',
+        'c' => 'к', 'w' => 'в', 'x' => 'кс', 'j' => 'й', 'q' => 'к']);
+}
+
+/** Город для фильтра: без «г.», без области после запятой, регистр и латиница не важны. */
 function vkl_city_key($s) {
     $s = str_replace('ё', 'е', mb_strtolower(trim((string)$s)));
     $s = preg_replace('/^(г\.|город)\s*/u', '', $s);
-    return trim(explode(',', $s)[0]);
+    $s = trim(explode(',', $s)[0]);
+    return preg_match('/[a-z]/', $s) ? vkl_translit_ru($s) : $s;
 }
 
 /** Церковь для фильтра: люди пишут одну и ту же церковь по-разному («БИХ», «Благодать Иисуса Христа Волгоград»). */
@@ -542,11 +552,14 @@ function vkl_bot_handle($u) {
     }
 
     $fileId = '';
+    $fileUniq = '';     // одинаковый у одного и того же файла, даже если его прислали повторно
     if (!empty($m['photo'])) {
         $fileId = end($m['photo'])['file_id'];
+        $fileUniq = end($m['photo'])['file_unique_id'] ?? '';
         $kind = 'photo';
     } elseif (!empty($m['document'])) {
         $fileId = $m['document']['file_id'];
+        $fileUniq = $m['document']['file_unique_id'] ?? '';
         $kind = 'document';
     }
 
@@ -555,9 +568,11 @@ function vkl_bot_handle($u) {
     if ($fileId === '' && $quoted && empty($quoted['from']['is_bot'])) {
         if (!empty($quoted['photo'])) {
             $fileId = end($quoted['photo'])['file_id'];
+            $fileUniq = end($quoted['photo'])['file_unique_id'] ?? '';
             $kind = 'photo';
         } elseif (!empty($quoted['document'])) {
             $fileId = $quoted['document']['file_id'];
+            $fileUniq = $quoted['document']['file_unique_id'] ?? '';
             $kind = 'document';
         }
         if ($fileId !== '') { $caption = $text; }
@@ -573,7 +588,7 @@ function vkl_bot_handle($u) {
             return;
         }
         if (!empty($e['files'])) {
-            $e['files'][] = ['id' => $fileId, 'kind' => $kind, 'file' => vkl_save_receipt($fileId, 'tg' . $uid)];
+            $e['files'][] = ['id' => $fileId, 'uniq' => $fileUniq, 'kind' => $kind, 'file' => vkl_save_receipt($fileId, 'tg' . $uid)];
             $state[$uid] = $e; vkl_json_save($statePath, $state);
             return;
         }
@@ -585,7 +600,7 @@ function vkl_bot_handle($u) {
 
     if ($fileId !== '') {
         $file = vkl_save_receipt($fileId, 'tg' . $uid . ($uname ? '_' . $uname : ''));
-        $e['files'][] = ['id' => $fileId, 'kind' => $kind, 'file' => $file];
+        $e['files'][] = ['id' => $fileId, 'uniq' => $fileUniq, 'kind' => $kind, 'file' => $file];
         $e['group'] = $group;
     } elseif ($text === '' || !$tokens) {
         $state[$uid] = $e; vkl_json_save($statePath, $state);
@@ -612,6 +627,29 @@ function vkl_bot_handle($u) {
     }
 
     $label = $idx > 0 ? trim(($rows[$idx][COL_LAST] ?? '') . ' ' . ($rows[$idx][COL_FIRST] ?? '')) : vkl_pretty($nameTokens);
+
+    // тот же файл уже присылали: за этого же человека — просто подтверждаем, за другого — предупреждаем организаторов
+    $knownPath = VKL_LEADS . '/receipt-ids.json';
+    $known = vkl_json_load($knownPath);
+    $before = [];
+    foreach ($e['files'] as $f) {
+        if (!empty($f['uniq']) && isset($known[$f['uniq']])) { $before[] = $known[$f['uniq']]; }
+    }
+    $labelKey = vkl_norm($label);
+    $samePerson = array_filter($before, function ($b) use ($labelKey) { return vkl_norm($b['label']) === $labelKey; });
+    if ($before && count($samePerson) === count($e['files'])) {
+        foreach ($e['files'] as $f) { if ($f['file'] !== '') { @unlink(VKL_RECEIPTS . '/' . $f['file']); } }
+        tg_say($chat, 'Этот чек у нас уже есть ✅ Всё в порядке, повторно отправлять не нужно.');
+        vkl_log('bot.log', 'повтор того же чека: ' . $label . ' (уже был ' . $before[0]['at'] . ')');
+        $state[$uid] = ['username' => $uname, 'at' => time(), 'group' => $group, 'done_name' => $label];
+        vkl_json_save($statePath, $state);
+        return;
+    }
+    $otherWho = [];
+    foreach ($before as $b) {
+        if (vkl_norm($b['label']) !== $labelKey) { $otherWho[] = $b['label'] . ' (' . $b['at'] . ')'; }
+    }
+
     $saved = [];
     foreach ($e['files'] as $f) { $saved[] = vkl_rename_receipt($f['file'], $label); }
     $mainFile = $saved[0] ?? '';
@@ -651,12 +689,18 @@ function vkl_bot_handle($u) {
     if ($firstName === '') { $firstName = 'друг'; }
     tg_say($chat, sprintf($T['thanks'], htmlspecialchars($firstName)));
 
+    if ($otherWho) { $note .= "\n⚠️ этот же чек раньше присылали за: " . implode(', ', $otherWho); }
     $cap = '🧾 <b>Чек</b>: ' . htmlspecialchars($who) . "\nTelegram: " . ($uname ? '@' . htmlspecialchars($uname) : 'id ' . $uid)
          . "\n" . htmlspecialchars($note);
     foreach ($e['files'] as $k => $f) {
         vkl_forward_admins($f['kind'], $f['id'], $k === 0 ? $cap : '🧾 ещё файл: ' . htmlspecialchars($who));
     }
-    vkl_log('bot.log', 'чек: ' . $who . ' | ' . $note . ' | ' . implode(', ', $saved));
+    vkl_log('bot.log', 'чек: ' . $who . ' | ' . str_replace("\n", ' ', $note) . ' | ' . implode(', ', $saved));
+
+    foreach ($e['files'] as $f) {
+        if (!empty($f['uniq'])) { $known[$f['uniq']] = ['label' => $label, 'at' => date('d.m H:i'), 'uid' => $uid]; }
+    }
+    vkl_json_save($knownPath, $known);
 
     $state[$uid] = ['username' => $uname, 'at' => time(), 'group' => $group, 'done_name' => $label];
     vkl_json_save($statePath, $state);
