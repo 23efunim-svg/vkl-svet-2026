@@ -273,6 +273,135 @@ function vkl_find_row($rows, $rid, $tokens, $username) {
     return -1;
 }
 
+/** Анкеты, сгруппированные по людям: [[индексы строк], ...]. Тестовые строки не входят. */
+function vkl_people_groups($rows) {
+    $parent = [];
+    $find = function ($x) use (&$parent) {
+        while ($parent[$x] !== $x) { $parent[$x] = $parent[$parent[$x]]; $x = $parent[$x]; }
+        return $x;
+    };
+    $buckets = [];
+    for ($i = 1; $i < count($rows); $i++) {
+        if (vkl_is_service_row($rows[$i])) { continue; }
+        $parent[$i] = $i;
+        $last = vkl_norm($rows[$i][COL_LAST] ?? '');
+        if ($last !== '') { $buckets[$last . '|' . vkl_norm($rows[$i][COL_FIRST] ?? '')][] = $i; }
+    }
+    foreach ($buckets as $ids) {
+        foreach ($ids as $a) {
+            foreach ($ids as $b) {
+                if ($a < $b && vkl_same_person($rows[$a], $rows[$b])) { $parent[$find($a)] = $find($b); }
+            }
+        }
+    }
+    $groups = [];
+    foreach (array_keys($parent) as $i) { $groups[$find($i)][] = $i; }
+    return array_values($groups);
+}
+
+function vkl_is_paid($status) {
+    return in_array(trim((string)$status), [ST_RECEIPT, ST_PAID, ST_NOFORM], true);
+}
+
+function vkl_amount($v) {
+    $n = (int)preg_replace('/\D+/', '', (string)$v);
+    return $n > 0 ? $n : 1000;
+}
+
+function vkl_ucfirst($s) {
+    return mb_strtoupper(mb_substr($s, 0, 1)) . mb_substr($s, 1);
+}
+
+/** Расстояние Левенштейна по буквам, а не байтам (для кириллицы). */
+function vkl_lev($a, $b) {
+    $a = mb_str_split($a); $b = mb_str_split($b);
+    $prev = range(0, count($b));
+    foreach ($a as $i => $ca) {
+        $cur = [$i + 1];
+        foreach ($b as $j => $cb) {
+            $cur[] = min($prev[$j + 1] + 1, $cur[$j] + 1, $prev[$j] + ($ca === $cb ? 0 : 1));
+        }
+        $prev = $cur;
+    }
+    return end($prev);
+}
+
+/** Город для фильтра: без «г.», без области после запятой, регистр не важен. */
+function vkl_city_key($s) {
+    $s = str_replace('ё', 'е', mb_strtolower(trim((string)$s)));
+    $s = preg_replace('/^(г\.|город)\s*/u', '', $s);
+    return trim(explode(',', $s)[0]);
+}
+
+/** Церковь для фильтра: люди пишут одну и ту же церковь по-разному («БИХ», «Благодать Иисуса Христа Волгоград»). */
+function vkl_church_label($s) {
+    $t = str_replace('ё', 'е', mb_strtolower(trim((string)$s)));
+    $rules = [
+        '/елей/u' => 'Елей',
+        '/благодать|(^|\W)бих(\W|$)/u' => 'Благодать Иисуса Христа',
+        '/спасител/u' => 'Иисуса Христа Спасителя',
+        '/нов\w*\s+жизн/u' => 'Новая жизнь',
+        '/дом\s+молитв/u' => 'Дом молитвы',
+        '/оцхве/u' => 'ОЦХВЕ',
+        '/путь\s+истин/u' => 'Путь истины',
+        '/истин/u' => 'Истина',
+        '/божий\s+путь/u' => 'Божий путь',
+        '/краеугольн/u' => 'Краеугольный камень',
+        '/святой\s+источник/u' => 'Святой источник',
+        '/не\s+посещ|не\s+хож/u' => 'Не посещает',
+    ];
+    foreach ($rules as $re => $label) {
+        if (preg_match($re, $t)) { return $label; }
+    }
+    $t = trim(preg_replace('/\s+/u', ' ', $t));
+    return $t === '' ? '' : vkl_ucfirst($t);
+}
+
+/**
+ * Участники без дублей, по одному на человека. Номер — по дате первой регистрации,
+ * данные — из самой свежей анкеты. Возвращает список, свежие сверху.
+ */
+function vkl_participants($rows) {
+    $list = [];
+    foreach (vkl_people_groups($rows) as $g) {
+        $alive = array_values(array_filter($g, function ($k) use ($rows) {
+            return trim($rows[$k][COL_STATUS] ?? '') !== ST_DUP;
+        }));
+        if (!$alive) { continue; }
+        $main = max($alive);
+        $status = trim($rows[$main][COL_STATUS] ?? '') ?: ST_WAIT;
+        foreach ($alive as $k) {
+            $s = trim($rows[$k][COL_STATUS] ?? '');
+            if (vkl_status_rank($s) > vkl_status_rank($status)) { $status = $s; }
+        }
+        $first = min(array_map(function ($k) use ($rows) { return $rows[$k][COL_TIME] ?? ''; }, $g));
+        $r = $rows[$main];
+        $list[] = ['first' => $first, 'row' => $main + 1, 'status' => $status, 'r' => $r,
+                   'forms' => count($g), 'paid' => vkl_is_paid($status), 'amount' => vkl_amount($r[COL_AMOUNT] ?? '')];
+    }
+    usort($list, function ($a, $b) { return strcmp($a['first'], $b['first']) ?: $a['row'] - $b['row']; });
+
+    // опечатки в названии города («Волгорад») склеиваем с самым частым похожим вариантом
+    $count = [];
+    foreach ($list as $p) { $k = vkl_city_key($p['r'][COL_CITY] ?? ''); if ($k !== '') { $count[$k] = ($count[$k] ?? 0) + 1; } }
+    arsort($count);
+    $canon = [];
+    foreach (array_keys($count) as $k) {
+        $canon[$k] = $k;
+        foreach (array_keys($count) as $big) {
+            if ($big === $k) { break; }
+            if (mb_strlen($k) >= 5 && vkl_lev($k, $big) <= 1) { $canon[$k] = $big; break; }
+        }
+    }
+    foreach ($list as $i => $p) {
+        $k = vkl_city_key($p['r'][COL_CITY] ?? '');
+        $list[$i]['num'] = $i + 1;
+        $list[$i]['city'] = $k === '' ? '' : vkl_ucfirst($canon[$k] ?? $k);
+        $list[$i]['church'] = vkl_church_label($p['r'][COL_CHURCH] ?? '');
+    }
+    return array_reverse($list);
+}
+
 /** Все анкеты, у которых и фамилия, и имя есть среди слов сообщения. */
 function vkl_find_all_rows($rows, $tokens) {
     $set = array_flip($tokens);
@@ -561,14 +690,13 @@ function vkl_admin_command($chat, $cmd, $arg) {
     }
     $rows = vkl_sheet_rows();
     if ($rows === null) { tg_say($chat, 'Таблица сейчас недоступна.'); return; }
-    $c = [];
-    for ($i = 1; $i < count($rows); $i++) {
-        $s = trim($rows[$i][COL_STATUS] ?? '') ?: ST_WAIT;
-        $c[$s] = ($c[$s] ?? 0) + 1;
-    }
-    $people = array_sum($c) - ($c[ST_DUP] ?? 0) - ($c[ST_TEST] ?? 0);
-    $lines = ['📊 <b>Участники</b>: ' . $people . ' (без дублей и тестов)'];
-    foreach ([ST_PAID, ST_RECEIPT, ST_NOFORM, ST_WAIT] as $s) { $lines[] = $s . ': ' . ($c[$s] ?? 0); }
-    $lines[] = '<a href="' . VKL_SHEET_URL . '">Открыть таблицу</a>';
+    $people = vkl_participants($rows);
+    $paid = array_filter($people, function ($p) { return $p['paid']; });
+    $sum = function ($ps) { return number_format(array_sum(array_column($ps, 'amount')), 0, '', ' '); };
+    $wait = array_filter($people, function ($p) { return !$p['paid']; });
+    $lines = ['📊 <b>Участники</b>: ' . count($people) . ' (без дублей и тестов)',
+              '✅ оплачено: ' . count($paid) . ' — ' . $sum($paid) . ' ₽',
+              '⏳ ожидают: ' . count($wait) . ' — ' . $sum($wait) . ' ₽',
+              '<a href="' . VKL_SITE . '/leads.php">Список участников</a> · <a href="' . VKL_SHEET_URL . '">Таблица</a>'];
     tg_say($chat, implode("\n", $lines));
 }

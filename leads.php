@@ -1,99 +1,268 @@
 <?php
-/** Просмотр журнала анкет. Логин и пароль — в secrets/panel-auth.txt вне папки сайта. */
+/**
+ * Участники конференции для организаторов. Источник — Google-таблица (там все анкеты и дубли),
+ * здесь каждый человек один раз: номер по дате первой регистрации, свежие сверху.
+ * Логин и пароль — в secrets/panel-auth.txt вне папки сайта.
+ */
 define('VKL_BOOT', 1);
 require __DIR__ . '/bot-lib.php';
-vkl_require_auth('Журнал анкет');
+vkl_require_auth('Участники');
 
-$dir = dirname(__DIR__) . '/leads';
-$files = glob($dir . '/leads-*.jsonl') ?: [];
-$backup = __DIR__ . '/.leads-backup.jsonl';
-if (file_exists($backup)) { $files[] = $backup; }
-rsort($files);
-
-$month = $_GET['m'] ?? '';
-$rows = [];
-foreach ($files as $f) {
-    if ($month && strpos(basename($f), $month) === false) { continue; }
-    foreach (file($f, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
-        $r = json_decode($line, true);
-        if (is_array($r)) { $rows[] = $r; }
-    }
+/** Таблица с кэшем на минуту, чтобы не дёргать Google на каждое обновление страницы. */
+function vkl_rows_cached($ttl = 60) {
+    $f = VKL_LEADS . '/sheet-cache.json';
+    $c = vkl_json_load($f);
+    if (isset($c['at'], $c['rows']) && time() - $c['at'] < $ttl && !isset($_GET['fresh'])) { return [$c['rows'], $c['at']]; }
+    $rows = vkl_sheet_rows();
+    if ($rows === null) { return [$c['rows'] ?? null, $c['at'] ?? 0]; }
+    vkl_json_save($f, ['at' => time(), 'rows' => $rows]);
+    return [$rows, time()];
 }
-usort($rows, fn($a, $b) => strcmp($b['time'] ?? '', $a['time'] ?? ''));
+
+list($rows, $at) = vkl_rows_cached();
+if ($rows === null) { http_response_code(503); exit('Таблица участников сейчас недоступна, попробуйте через минуту.'); }
+$people = vkl_participants($rows);
+
+function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES); }
+function rub($n) { return number_format($n, 0, '', ' ') . ' ₽'; }
+function vkl_date($s) { $t = strtotime((string)$s); return $t ? date('d.m.Y H:i', $t) : (string)$s; }
+function vkl_tg_nick($s) {
+    $t = ltrim(preg_replace('#^https?://t\.me/#i', '', trim((string)$s)), '@');
+    return preg_match('/^[A-Za-z][A-Za-z0-9_]{3,31}$/', $t) ? $t : '';
+}
+function vkl_fio($r) { return trim(($r[COL_LAST] ?? '') . ' ' . ($r[COL_FIRST] ?? '') . ' ' . ($r[COL_PATR] ?? '')); }
 
 if (isset($_GET['json'])) {
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode($rows, JSON_UNESCAPED_UNICODE);
+    echo json_encode(array_map(function ($p) {
+        $r = $p['r'];
+        return ['num' => $p['num'], 'registered' => $p['first'], 'name' => vkl_fio($r), 'phone' => $r[COL_PHONE] ?? '',
+                'telegram' => $r[COL_TG] ?? '', 'city' => $p['city'], 'age' => $r[COL_AGE] ?? '', 'paid' => $p['paid'],
+                'status' => $p['status'], 'church' => $r[COL_CHURCH] ?? ''];
+    }, $people), JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 if (isset($_GET['csv'])) {
     header('Content-Type: text/csv; charset=windows-1251');
-    header('Content-Disposition: attachment; filename="vkl-svet-anketi.csv"');
+    header('Content-Disposition: attachment; filename="vkl-svet-uchastniki.csv"');
     $out = fopen('php://output', 'w');
-    $head = ['Время','Фамилия','Имя','Отчество','Дата рождения','Возраст','Пол','Телефон','Почта','Город','Церковь','Telegram','Сопровождающий','Телефон сопровождающего','Вопрос','Сумма'];
-    fputcsv($out, array_map(fn($h) => iconv('UTF-8', 'Windows-1251//TRANSLIT', $h), $head), ';');
-    foreach ($rows as $r) {
-        $line = [$r['time'] ?? '', $r['lastName'] ?? '', $r['firstName'] ?? '', $r['patronymic'] ?? '',
-                 $r['birthDate'] ?? '', $r['age'] ?? '', $r['gender'] ?? '', $r['phone'] ?? '',
-                 $r['email'] ?? '', $r['city'] ?? '', $r['church'] ?? '', $r['telegram'] ?? '',
-                 $r['guardianName'] ?? '', $r['guardianPhone'] ?? '', $r['comment'] ?? '', $r['amount'] ?? ''];
-        fputcsv($out, array_map(fn($v) => iconv('UTF-8', 'Windows-1251//TRANSLIT', (string)$v), $line), ';');
+    $enc = function ($v) { return iconv('UTF-8', 'Windows-1251//TRANSLIT', (string)$v); };
+    fputcsv($out, array_map($enc, ['№', 'Дата регистрации', 'ФИО', 'Телефон', 'Telegram', 'Город', 'Возраст', 'Оплата',
+        'Церковь', 'Сопровождающий', 'Телефон сопровождающего', 'Вопрос', 'Дата рождения', 'Пол', 'Почта', 'Сумма']), ';');
+    foreach ($people as $p) {
+        $r = $p['r'];
+        fputcsv($out, array_map($enc, [$p['num'], vkl_date($p['first']), vkl_fio($r), $r[COL_PHONE] ?? '', $r[COL_TG] ?? '',
+            $p['city'], $r[COL_AGE] ?? '', $p['paid'] ? 'оплачено' : 'не оплачено', $r[COL_CHURCH] ?? '',
+            $r[COL_GNAME] ?? '', $r[COL_GPHONE] ?? '', $r[COL_COMMENT] ?? '', $r[COL_BIRTH] ?? '', $r[COL_GENDER] ?? '',
+            $r[COL_EMAIL] ?? '', $p['amount']]), ';');
     }
     exit;
 }
+
+$cities = $churches = [];
+foreach ($people as $p) {
+    if ($p['city'] !== '') { $cities[$p['city']] = ($cities[$p['city']] ?? 0) + 1; }
+    if ($p['church'] !== '') { $churches[$p['church']] = ($churches[$p['church']] ?? 0) + 1; }
+}
+arsort($cities); arsort($churches);
 ?><!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Анкеты — Включите свет 2026</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Участники — Включите свет 2026</title>
 <style>
-  body { margin:0; background:#16150F; color:#E8DFCE; font:15px/1.5 -apple-system,Segoe UI,Arial,sans-serif; }
-  .wrap { max-width:1400px; margin:0 auto; padding:26px 18px 60px; }
-  h1 { font-size:22px; margin:0 0 6px; }
-  .sub { color:#A9A08D; font-size:14px; margin-bottom:20px; }
-  .btn { display:inline-block; padding:9px 16px; background:#4CBD49; color:#16150F;
-         font-weight:700; text-decoration:none; border-radius:2px; font-size:13px; }
-  table { width:100%; border-collapse:collapse; font-size:13.5px; }
-  th, td { padding:8px 10px; border-bottom:1px solid rgba(232,223,206,.14); text-align:left; vertical-align:top; }
-  th { color:#4CBD49; font-size:12px; text-transform:uppercase; letter-spacing:.06em; position:sticky; top:0; background:#16150F; }
-  tr:hover td { background:rgba(232,223,206,.04); }
-  .num { color:#A9A08D; }
-  .minor { color:#FFF7AE; }
+  :root { --bg:#16150F; --card:#1F1D16; --line:rgba(232,223,206,.14); --text:#E8DFCE; --dim:#A9A08D;
+          --green:#4CBD49; --green-bg:rgba(76,189,73,.14); --red:#E8907A; --red-bg:rgba(232,144,122,.13);
+          --yellow:#FFF7AE; --yellow-bg:rgba(255,247,174,.12); }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 -apple-system,Segoe UI,Arial,sans-serif; }
+  .wrap { max-width:1500px; margin:0 auto; padding:24px 16px 60px; }
+  .top { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:10px 20px; margin-bottom:18px; }
+  h1 { font-size:22px; margin:0; }
+  .meta { color:var(--dim); font-size:13px; }
+  .meta a { color:var(--dim); }
+  .meta a.btn { color:var(--bg); }
+  td.fio { min-width:200px; }
+  .btn { display:inline-block; padding:8px 14px; background:var(--green); color:var(--bg); font-weight:700;
+         text-decoration:none; border:0; border-radius:2px; font-size:13px; cursor:pointer; }
+  .btn--ghost { background:transparent; color:var(--text); border:1px solid var(--line); }
+
+  .dash { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:18px; }
+  .kpi { background:var(--card); border:1px solid var(--line); padding:14px 16px; }
+  .kpi__l { color:var(--dim); font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
+  .kpi__v { font-size:28px; font-weight:700; margin-top:4px; font-variant-numeric:tabular-nums; }
+  .kpi__s { color:var(--dim); font-size:13px; margin-top:2px; }
+  .kpi--paid .kpi__v { color:var(--green); }
+  .kpi--wait .kpi__v { color:var(--red); }
+
+  .filters { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; }
+  .filters input, .filters select { background:var(--card); color:var(--text); border:1px solid var(--line);
+         padding:8px 10px; font:inherit; font-size:14px; border-radius:2px; }
+  .filters input { min-width:220px; flex:1 1 220px; max-width:320px; }
+  .shown { color:var(--dim); font-size:13px; margin-left:auto; }
+
+  .tbl { overflow-x:auto; border:1px solid var(--line); }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { padding:8px 10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  th { color:var(--green); font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; position:sticky; top:0;
+       background:var(--bg); white-space:nowrap; z-index:1; }
+  tr:hover td { background:rgba(232,223,206,.035); }
+  td.num { color:var(--dim); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  td.nw { white-space:nowrap; }
+  td a { color:var(--text); text-decoration:none; border-bottom:1px dotted var(--dim); }
+  .sub { color:var(--dim); font-size:12px; }
+  .minor { display:inline-block; margin-left:6px; padding:0 6px; font-size:11px; color:var(--yellow); background:var(--yellow-bg); }
+  .pay { display:inline-block; padding:2px 8px; font-size:12.5px; font-weight:600; white-space:nowrap; }
+  .pay--yes { color:var(--green); background:var(--green-bg); }
+  .pay--no { color:var(--red); background:var(--red-bg); }
+  .pay--noform { color:var(--yellow); background:var(--yellow-bg); }
+  .note { color:var(--dim); font-size:12px; margin-top:10px; }
+  .empty { padding:30px; text-align:center; color:var(--dim); }
+
+  @media (max-width:800px) {
+    .dash { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .kpi__v { font-size:22px; }
+    .shown { margin-left:0; width:100%; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Анкеты конференции «Включите свет 2026»</h1>
-  <p class="sub">
-    Всего записей: <b><?= count($rows) ?></b>
-    &nbsp;·&nbsp; <a class="btn" href="?csv=1">Скачать для Excel</a>
-  </p>
+  <div class="top">
+    <h1>Участники «Включите свет 2026»</h1>
+    <div class="meta">
+      Данные таблицы на <?= date('H:i', $at) ?> · <a href="?fresh=1">обновить</a>
+      &nbsp; <a class="btn" href="?csv=1">Скачать для Excel</a>
+    </div>
+  </div>
 
+  <div class="dash">
+    <div class="kpi"><div class="kpi__l">Регистраций</div><div class="kpi__v" id="kReg">—</div><div class="kpi__s" id="kRegS"></div></div>
+    <div class="kpi"><div class="kpi__l">Городов</div><div class="kpi__v" id="kCity">—</div><div class="kpi__s" id="kCityS"></div></div>
+    <div class="kpi kpi--paid"><div class="kpi__l">Оплачено</div><div class="kpi__v" id="kPaid">—</div><div class="kpi__s" id="kPaidS"></div></div>
+    <div class="kpi kpi--wait"><div class="kpi__l">Не оплачено</div><div class="kpi__v" id="kWait">—</div><div class="kpi__s" id="kWaitS"></div></div>
+  </div>
+
+  <div class="filters">
+    <input type="search" id="fq" placeholder="Поиск: имя, телефон, ник">
+    <select id="fcity"><option value="">Все города</option>
+      <?php foreach ($cities as $c => $n): ?><option value="<?= h($c) ?>"><?= h($c) ?> (<?= $n ?>)</option><?php endforeach; ?>
+    </select>
+    <select id="fage">
+      <option value="">Любой возраст</option>
+      <option value="0-17">до 18 лет</option>
+      <option value="18-200">18 и старше</option>
+      <option value="14-15">14–15</option>
+      <option value="16-17">16–17</option>
+      <option value="18-24">18–24</option>
+      <option value="25-34">25–34</option>
+      <option value="35-200">35 и старше</option>
+    </select>
+    <select id="fchurch"><option value="">Все церкви</option>
+      <?php foreach ($churches as $c => $n): ?><option value="<?= h($c) ?>"><?= h($c) ?> (<?= $n ?>)</option><?php endforeach; ?>
+    </select>
+    <select id="fpaid">
+      <option value="">Оплата: все</option>
+      <option value="1">Оплачено</option>
+      <option value="0">Не оплачено</option>
+    </select>
+    <button class="btn btn--ghost" id="freset" type="button">Сбросить</button>
+    <span class="shown" id="shown"></span>
+  </div>
+
+  <div class="tbl">
   <table>
-    <tr>
-      <th>#</th><th>Время</th><th>Участник</th><th>Дата рождения</th><th>Телефон</th>
-      <th>Почта</th><th>Город</th><th>Церковь</th><th>Telegram</th><th>Сопровождающий</th><th>Вопрос</th>
-    </tr>
-    <?php foreach ($rows as $i => $r): $age = $r['age'] ?? ''; ?>
-    <tr>
-      <td class="num"><?= count($rows) - $i ?></td>
-      <td class="num"><?= htmlspecialchars($r['time'] ?? '') ?></td>
-      <td>
-        <?= htmlspecialchars(trim(($r['lastName'] ?? '') . ' ' . ($r['firstName'] ?? '') . ' ' . ($r['patronymic'] ?? ''))) ?>
-        <?php if ($age !== '' && (int)$age < 18): ?><br><span class="minor">до 18 лет</span><?php endif; ?>
-      </td>
-      <td class="num"><?= htmlspecialchars($r['birthDate'] ?? '') ?></td>
-      <td><?= htmlspecialchars($r['phone'] ?? '') ?></td>
-      <td><?= htmlspecialchars($r['email'] ?? '') ?></td>
-      <td><?= htmlspecialchars($r['city'] ?? '') ?></td>
-      <td><?= htmlspecialchars($r['church'] ?? '') ?></td>
-      <td><?= htmlspecialchars($r['telegram'] ?? '') ?></td>
-      <td><?= htmlspecialchars(trim(($r['guardianName'] ?? '') . ' ' . ($r['guardianPhone'] ?? ''))) ?></td>
-      <td><?= htmlspecialchars($r['comment'] ?? '') ?></td>
-    </tr>
+    <thead><tr>
+      <th>№</th><th>Дата регистрации</th><th>ФИО</th><th>Телефон</th><th>Telegram</th><th>Город</th>
+      <th>Возраст</th><th>Оплата</th><th>Церковь</th><th>Сопровождающий</th><th>Вопрос</th>
+    </tr></thead>
+    <tbody id="tb">
+    <?php foreach ($people as $p): $r = $p['r']; $age = trim($r[COL_AGE] ?? ''); $nick = vkl_tg_nick($r[COL_TG] ?? '');
+          $phone = trim($r[COL_PHONE] ?? ''); $gname = trim($r[COL_GNAME] ?? ''); $gphone = trim($r[COL_GPHONE] ?? '');
+          $search = mb_strtolower(vkl_fio($r) . ' ' . $phone . ' ' . preg_replace('/\D/', '', $phone) . ' ' . ($r[COL_TG] ?? '')); ?>
+      <tr data-city="<?= h($p['city']) ?>" data-church="<?= h($p['church']) ?>" data-age="<?= h($age) ?>"
+          data-paid="<?= $p['paid'] ? 1 : 0 ?>" data-amount="<?= $p['amount'] ?>" data-q="<?= h($search) ?>">
+        <td class="num"><?= $p['num'] ?></td>
+        <td class="num"><?= h(vkl_date($p['first'])) ?></td>
+        <td class="fio"><?= h(vkl_fio($r)) ?><?php if ($p['forms'] > 1): ?><div class="sub">анкет: <?= $p['forms'] ?></div><?php endif; ?></td>
+        <td class="nw"><?php if ($phone !== ''): ?><a href="tel:<?= h(preg_replace('/[^\d+]/', '', $phone)) ?>"><?= h($phone) ?></a><?php endif; ?></td>
+        <td class="nw"><?php if ($nick !== ''): ?><a href="https://t.me/<?= h($nick) ?>" target="_blank" rel="noopener">@<?= h($nick) ?></a><?php else: ?><?= h($r[COL_TG] ?? '') ?><?php endif; ?></td>
+        <td><?= h($p['city']) ?></td>
+        <td class="nw"><?= h($age) ?><?php if ($age !== '' && (int)$age < 18): ?><span class="minor">до 18</span><?php endif; ?></td>
+        <td><?php if ($p['status'] === ST_NOFORM): ?><span class="pay pay--noform">✓ чек без анкеты</span>
+            <?php elseif ($p['paid']): ?><span class="pay pay--yes">✓ оплачено</span>
+            <?php else: ?><span class="pay pay--no">не оплачено</span><?php endif; ?></td>
+        <td><?= h($r[COL_CHURCH] ?? '') ?></td>
+        <td><?= h($gname) ?><?php if ($gphone !== ''): ?><div class="sub"><a href="tel:<?= h(preg_replace('/[^\d+]/', '', $gphone)) ?>"><?= h($gphone) ?></a></div><?php endif; ?></td>
+        <td><?= h($r[COL_COMMENT] ?? '') ?></td>
+      </tr>
     <?php endforeach; ?>
+    </tbody>
   </table>
+  <div class="empty" id="empty" hidden>Никого не нашлось — измените фильтры.</div>
+  </div>
+  <p class="note">Каждый человек показан один раз: повторные анкеты склеены, номер — по дате первой регистрации.
+    Полные данные со всеми анкетами — в Google-таблице. Суммы считаются по пожертвованию, указанному в анкете.</p>
 </div>
+
+<script>
+(function () {
+  var rows = Array.prototype.slice.call(document.querySelectorAll('#tb tr'));
+  var $ = function (id) { return document.getElementById(id); };
+  var f = { q: $('fq'), city: $('fcity'), age: $('fage'), church: $('fchurch'), paid: $('fpaid') };
+  var fmt = function (n) { return n.toLocaleString('ru-RU').replace(/,/g, ' ') + ' ₽'; };
+  var people = function (n) {
+    var m10 = n % 10, m100 = n % 100;
+    return n + (m10 === 1 && m100 !== 11 ? ' человек' : (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? ' человека' : ' человек'));
+  };
+
+  function apply() {
+    var q = f.q.value.trim().toLowerCase(), qd = q.replace(/\D/g, '');
+    var age = f.age.value ? f.age.value.split('-').map(Number) : null;
+    var shown = 0, cities = {}, paidN = 0, paidSum = 0, waitN = 0, waitSum = 0, minors = 0;
+    rows.forEach(function (tr) {
+      var d = tr.dataset, a = parseInt(d.age, 10);
+      var ok = (!f.city.value || d.city === f.city.value)
+        && (!f.church.value || d.church === f.church.value)
+        && (!f.paid.value || d.paid === f.paid.value)
+        && (!age || (!isNaN(a) && a >= age[0] && a <= age[1]))
+        && (!q || d.q.indexOf(q) !== -1 || (qd.length >= 4 && d.q.indexOf(qd) !== -1));
+      tr.hidden = !ok;
+      if (!ok) return;
+      shown++;
+      if (d.city) cities[d.city] = 1;
+      if (!isNaN(a) && a < 18) minors++;
+      if (d.paid === '1') { paidN++; paidSum += +d.amount; } else { waitN++; waitSum += +d.amount; }
+    });
+    var cityList = Object.keys(cities);
+    $('kReg').textContent = shown;
+    $('kRegS').textContent = 'из них до 18 лет: ' + minors;
+    $('kCity').textContent = cityList.length;
+    $('kCityS').textContent = cityList.length === 1 ? cityList[0] : '';
+    $('kPaid').textContent = fmt(paidSum);
+    $('kPaidS').textContent = people(paidN);
+    $('kWait').textContent = fmt(waitSum);
+    $('kWaitS').textContent = people(waitN);
+    $('shown').textContent = shown === rows.length ? 'Всего: ' + rows.length : 'Показано: ' + shown + ' из ' + rows.length;
+    $('empty').hidden = shown > 0;
+    try {
+      var s = new URLSearchParams();
+      Object.keys(f).forEach(function (k) { if (f[k].value) s.set(k, f[k].value); });
+      history.replaceState(null, '', s.toString() ? '#' + s.toString() : location.pathname + location.search);
+    } catch (e) {}
+  }
+
+  try {
+    var init = new URLSearchParams(location.hash.slice(1));
+    Object.keys(f).forEach(function (k) { if (init.get(k)) f[k].value = init.get(k); });
+  } catch (e) {}
+  Object.keys(f).forEach(function (k) { f[k].addEventListener(k === 'q' ? 'input' : 'change', apply); });
+  $('freset').addEventListener('click', function () { Object.keys(f).forEach(function (k) { f[k].value = ''; }); apply(); });
+  apply();
+})();
+</script>
 </body>
 </html>
