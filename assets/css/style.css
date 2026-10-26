@@ -2253,6 +2253,9 @@ a.contact:hover .contact__v { color: var(--green); }
   margin-inline: auto;
 }
 .pay__qr img { width: clamp(180px, 22vw, 240px); height: auto; display: block; }
+.pay__qrcol { display: grid; gap: 10px; justify-items: center; }
+.pay__link { width: 100%; max-width: 268px; text-align: center; }
+.pay__linkhint { margin: 0; max-width: 268px; font-size: 13px; line-height: 1.45; text-align: center; }
 .pay__qr .hint { color: #4a4438; }
 
 .pay__steps { margin: 0; padding-left: 20px; display: grid; gap: 16px; }

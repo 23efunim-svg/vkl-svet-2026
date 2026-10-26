@@ -13,7 +13,6 @@
     API: '',                       // например https://functions.yandexcloud.net/d4xxxxxxxxxx
     AMOUNT_MIN: 1000,
     CONF_DATE: '2026-11-26',
-    MIN_AGE: 14,
     DRAFT_KEY: 'vkl2026_reg_draft'
   };
   // пока бэкенд не развёрнут, форма работает в демонстрационном режиме
@@ -52,28 +51,26 @@
     return a;
   };
 
+  var yearsWord = function (n) {
+    var m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return 'год';
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'года';
+    return 'лет';
+  };
+
   var birth = $('#birthDate');
   var ageBlock = $('#ageBlock');
 
   var renderAgeBlock = function () {
     var a = ageOnConf(birth.value);
-    if (a === null) { ageBlock.hidden = true; ageBlock.innerHTML = ''; return; }
+    if (a === null || a < 0) { ageBlock.hidden = true; ageBlock.innerHTML = ''; return; }
 
-    if (a < CONFIG.MIN_AGE) {
-      ageBlock.hidden = false;
-      ageBlock.innerHTML =
-        '<div class="age-note" style="border-color:#D2643F;background:rgba(210,100,63,.09)">' +
-        'Регистрация на конференцию открыта с 14 лет. Напиши нам в ' +
-        '<a href="https://t.me/vkl_svet" class="green" target="_blank" rel="noopener">Telegram</a>, ' +
-        'разберём твою ситуацию отдельно.</div>';
-      return;
-    }
-
+    // возрастного ограничения нет; младше 18 — обязательно сопровождающий
     if (a < 18) {
       ageBlock.hidden = false;
       ageBlock.innerHTML =
         '<div class="age-note">' +
-        '<b>Тебе на конференции будет ' + a + ' лет.</b> Понадобится доверенность от родителей ' +
+        '<b>Тебе на конференции будет ' + a + ' ' + yearsWord(a) + '.</b> Понадобится доверенность от родителей ' +
         'на совершеннолетнего сопровождающего, её нужно иметь при себе все дни. ' +
         'Бланк пришлём после регистрации.' +
         '</div>' +
@@ -149,7 +146,7 @@
     if (!birth.value) { bad(birth); } else { setErr(birth, false); }
 
     var age = ageOnConf(birth.value);
-    if (age !== null && age < CONFIG.MIN_AGE) { bad(birth); }
+    if (age !== null && age < 0) { bad(birth); }     // дата рождения позже конференции
 
     var gender = form.querySelector('input[name="gender"]:checked');
     var genderField = form.querySelector('input[name="gender"]');
@@ -165,7 +162,7 @@
     else { setErr(church, false); }
 
     // несовершеннолетним нужны данные сопровождающего и отчество
-    if (age !== null && age >= CONFIG.MIN_AGE && age < 18) {
+    if (age !== null && age >= 0 && age < 18) {
       var gn = $('#guardianName'), gp = $('#guardianPhone'), pt = $('#patronymic');
       if (gn && gn.value.trim().length < 3) { bad(gn); } else if (gn) { setErr(gn, false); }
       if (gp && !isPhone(gp.value)) { bad(gp); } else if (gp) { setErr(gp, false); }

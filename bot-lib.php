@@ -52,19 +52,29 @@ function vkl_require_auth($realm) {
 
 /* ---------------------------------------------------------------- Telegram */
 
-function tg($method, $params = []) {
+/**
+ * Запрос к Telegram. Связь хостинга с Telegram иногда рвётся (было 22–24.10.2026),
+ * поэтому при обрыве сети повторяем: ответ человеку не должен теряться из-за одной неудачи.
+ */
+function tg($method, $params = [], $tries = 3) {
     $token = vkl_secret('bot-token.txt');
     if ($token === '') { return null; }
-    $ch = curl_init("https://api.telegram.org/bot$token/$method");
-    curl_setopt_array($ch, [
-        CURLOPT_POST => true,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 25,
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-        CURLOPT_POSTFIELDS => json_encode($params, JSON_UNESCAPED_UNICODE),
-    ]);
-    $res = json_decode((string)curl_exec($ch), true);
-    curl_close($ch);
+    $res = null;
+    for ($i = 0; $i < $tries; $i++) {
+        if ($i > 0) { sleep($i); }
+        $ch = curl_init("https://api.telegram.org/bot$token/$method");
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_TIMEOUT => 25,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS => json_encode($params, JSON_UNESCAPED_UNICODE),
+        ]);
+        $res = json_decode((string)curl_exec($ch), true);
+        curl_close($ch);
+        if (is_array($res)) { break; }      // Telegram ответил (пусть даже ошибкой) — повторять нечего
+    }
     if (empty($res['ok'])) {
         vkl_log('bot-errors.log', "tg $method: " . substr(json_encode($res, JSON_UNESCAPED_UNICODE), 0, 300));
     }
@@ -108,7 +118,7 @@ function vkl_watchdog($force = false) {
     if (!$force && time() - ($w['checked_at'] ?? 0) < 600) { return $w; }
     $w['checked_at'] = time();
 
-    $info = tg('getWebhookInfo');
+    $info = tg('getWebhookInfo', [], 1);    // сторож ходит каждую минуту — без повторов
     if (empty($info['ok'])) {
         $w['state'] = 'Telegram API недоступен';
         vkl_json_save($file, $w);
@@ -122,12 +132,21 @@ function vkl_watchdog($force = false) {
         $set = vkl_set_webhook();
         $w['state'] = !empty($set['ok']) ? 'вебхук был снят и восстановлен' : 'вебхук не ставится';
         vkl_alert('⚠️ <b>Бот:</b> ' . $w['state'] . '. ' . htmlspecialchars($set['description'] ?? ''));
-    } elseif (!empty($r['last_error_date']) && $r['last_error_date'] > ($w['alerted_error'] ?? 0)
-              && time() - $r['last_error_date'] < 7200) {
-        $w['alerted_error'] = $r['last_error_date'];
-        $w['state'] = 'ошибка доставки';
-        vkl_alert('⚠️ <b>Бот:</b> Telegram не может доставить сообщения на сайт: '
-            . htmlspecialchars($r['last_error_message'] ?? '') . '. В очереди: ' . ($r['pending_update_count'] ?? 0));
+    } else {
+        // разовые ошибки доставки Telegram повторяет сам; тревожим, только если сообщения застряли надолго
+        $pending = (int)($r['pending_update_count'] ?? 0);
+        if ($pending > 0) {
+            $w['pending_since'] = $w['pending_since'] ?? time();
+            if (time() - $w['pending_since'] >= 600 && empty($w['pending_alerted'])) {
+                $w['pending_alerted'] = time();
+                $w['state'] = 'сообщения застряли';
+                vkl_alert('⚠️ <b>Бот:</b> ' . $pending . ' сообщ. не могут дойти до сайта больше 10 минут. Последняя ошибка: '
+                    . htmlspecialchars($r['last_error_message'] ?? '—') . '. Telegram продолжает попытки сам.');
+            }
+        } else {
+            if (!empty($w['pending_alerted'])) { vkl_alert('✅ <b>Бот:</b> сообщения снова доходят до сайта.'); }
+            unset($w['pending_since'], $w['pending_alerted'], $w['alerted_error']);
+        }
     }
     vkl_json_save($file, $w);
     return $w;
@@ -235,6 +254,12 @@ function vkl_is_service_row($r) {
     return $s === ST_TEST;
 }
 
+/** Можно ли привязать чек к этой строке по имени или нику: не тест и не дубль (у дубля есть актуальная анкета). */
+function vkl_is_match_target($r) {
+    $s = trim((string)($r[COL_STATUS] ?? ''));
+    return $s !== ST_TEST && $s !== ST_DUP;
+}
+
 /**
  * Ищем анкету. Порядок: код из ссылки на сайте → фамилия+имя (в любом порядке) → ник Telegram.
  * Возвращает индекс строки (с нуля, 0 — заголовок) или -1.
@@ -252,7 +277,7 @@ function vkl_find_row($rows, $rid, $tokens, $username) {
         $hits = [];
         for ($i = $n - 1; $i >= 1; $i--) {
             $r = $rows[$i];
-            if (vkl_is_service_row($r)) { continue; }
+            if (!vkl_is_match_target($r)) { continue; }
             $last = vkl_norm($r[COL_LAST] ?? '');
             $first = vkl_norm($r[COL_FIRST] ?? '');
             if ($last !== '' && $first !== '' && isset($set[$last]) && isset($set[$first])) { $hits[] = $i; }
@@ -267,21 +292,36 @@ function vkl_find_row($rows, $rid, $tokens, $username) {
     }
     if ($uname !== '') {
         for ($i = $n - 1; $i >= 1; $i--) {
-            if (!vkl_is_service_row($rows[$i]) && vkl_uname($rows[$i][COL_TG] ?? '') === $uname) { return $i; }
+            if (vkl_is_match_target($rows[$i]) && vkl_uname($rows[$i][COL_TG] ?? '') === $uname) { return $i; }
         }
     }
     return -1;
 }
 
+function vkl_is_paid_way($payway) {
+    return in_array($payway, [PAY_CARD, PAY_CASH1000, PAY_CASH500], true);
+}
+
 /**
- * Статус неоплаченной строки следует за категорией: организатор → «не требуется», остальные → «ожидает оплаты».
- * Возвращает ячейки для записи. Оплаченные, дубли и тесты не трогает.
+ * Какой статус должен стоять у строки по категории и отметке «Как оплатил».
+ * Отметка оплаты (безнал/наличка) → «оплачено»; организатор или «бесплатно» → «не требуется»; иначе «ожидает оплаты».
+ * «Чек получен», «оплачено» без отметки, «чек без анкеты», дубли и тесты не трогаем. null — менять не нужно.
  */
-function vkl_role_status_cells($rowNum, $status, $role) {
-    $status = trim((string)$status);
-    if ($status !== '' && $status !== ST_WAIT && $status !== ST_FREE) { return []; }
-    $want = $role === ROLE_ORG ? ST_FREE : ST_WAIT;
-    return $status === $want ? [] : ['B' . $rowNum => $want];
+function vkl_status_target($status, $role, $payway) {
+    $s = trim((string)$status);
+    if (vkl_is_paid_way($payway)) {
+        return in_array($s, ['', ST_WAIT, ST_FREE], true) ? ST_PAID : null;
+    }
+    if (!in_array($s, ['', ST_WAIT, ST_FREE], true)) { return null; }
+    $want = ($role === ROLE_ORG || $payway === PAY_FREE) ? ST_FREE : ST_WAIT;
+    return $s === $want ? null : $want;
+}
+
+/** Ячейка статуса для строки таблицы (номер с единицы), если статус надо поправить. */
+function vkl_status_cells($rowNum, $r) {
+    $role = trim($r[COL_ROLE] ?? '') ?: ROLE_PART;
+    $want = vkl_status_target($r[COL_STATUS] ?? '', $role, trim($r[COL_PAYWAY] ?? ''));
+    return $want === null ? [] : ['B' . $rowNum => $want];
 }
 
 /** Анкеты, сгруппированные по людям: [[индексы строк], ...]. Тестовые строки не входят. */
@@ -319,11 +359,15 @@ function vkl_amount($v) {
     return $n > 0 ? $n : VKL_RECOMMENDED;
 }
 
-/** Сколько ждём от человека: организатор — ничего, служитель — половину рекомендуемого, участник — сумму из анкеты. */
-function vkl_expected($role, $declared) {
+/**
+ * Сколько ждём от человека: организатор — ничего, служитель — половину рекомендуемого, участник — рекомендуемое.
+ * Сумму из анкеты не берём: это намерение, а не факт (25.10 в анкете оказалось 681 500 ₽ — опечатка).
+ * Реальную сумму, если она другая, вписывают в «Получено, ₽».
+ */
+function vkl_expected($role, $declared = 0) {
     if ($role === ROLE_ORG) { return 0; }
     if ($role === ROLE_SERV) { return (int)round(VKL_RECOMMENDED * VKL_SERV_SHARE); }
-    return $declared;
+    return VKL_RECOMMENDED;
 }
 
 function vkl_ucfirst($s) {
@@ -405,23 +449,27 @@ function vkl_participants($rows) {
         $first = min(array_map(function ($k) use ($rows) { return $rows[$k][COL_TIME] ?? ''; }, $g));
         $r = $rows[$main];
 
-        // категорию и полученную сумму ставит человек вручную — берём из свежей анкеты, иначе из любой
-        $role = ''; $got = 0;
+        // категорию, полученную сумму и способ оплаты ставят люди вручную — из свежей анкеты, иначе из любой
+        $role = ''; $got = 0; $payway = '';
         foreach (array_merge([$main], $alive) as $k) {
             if ($role === '') { $role = trim($rows[$k][COL_ROLE] ?? ''); }
             if ($got === 0) { $got = (int)preg_replace('/\D+/', '', (string)($rows[$k][COL_GOT] ?? '')); }
+            if ($payway === '') { $payway = trim($rows[$k][COL_PAYWAY] ?? ''); }
         }
-        if ($role === '' && $status === ST_FREE) { $role = ROLE_ORG; }   // в таблице выбрали статус «не требуется»
         $role = in_array($role, [ROLE_SERV, ROLE_ORG], true) ? $role : ROLE_PART;
+        $payway = in_array($payway, [PAY_CARD, PAY_CASH1000, PAY_CASH500, PAY_FREE], true) ? $payway : '';
+        $cash = $payway === PAY_CASH1000 ? 1000 : ($payway === PAY_CASH500 ? 500 : 0);
         $declared = vkl_amount($r[COL_AMOUNT] ?? '');
         $expected = vkl_expected($role, $declared);
-        $paid = vkl_is_paid($status) || $got > 0;
-        $state = $paid ? 'paid' : ($expected > 0 ? 'wait' : 'free');
-        $amount = $paid ? ($got > 0 ? $got : ($role === ROLE_SERV ? $expected : $declared)) : $expected;
+        $paid = vkl_is_paid($status) || $got > 0 || vkl_is_paid_way($payway);
+        $free = !$paid && ($payway === PAY_FREE || $status === ST_FREE || $expected === 0);
+        $state = $paid ? 'paid' : ($free ? 'free' : 'wait');
+        $amount = $paid ? ($got > 0 ? $got : ($cash > 0 ? $cash : ($expected > 0 ? $expected : VKL_RECOMMENDED)))
+                        : ($state === 'wait' ? $expected : 0);
 
         $list[] = ['first' => $first, 'row' => $main + 1, 'status' => $status, 'r' => $r, 'forms' => count($g),
                    'paid' => $paid, 'state' => $state, 'role' => $role, 'declared' => $declared, 'got' => $got,
-                   'amount' => $amount];
+                   'payway' => $payway, 'cash' => $paid && $cash > 0, 'amount' => $amount];
     }
     usort($list, function ($a, $b) { return strcmp($a['first'], $b['first']) ?: $a['row'] - $b['row']; });
 
@@ -451,7 +499,7 @@ function vkl_find_all_rows($rows, $tokens) {
     $set = array_flip($tokens);
     $hits = [];
     for ($i = 1; $i < count($rows); $i++) {
-        if (vkl_is_service_row($rows[$i])) { continue; }
+        if (!vkl_is_match_target($rows[$i])) { continue; }
         $last = vkl_norm($rows[$i][COL_LAST] ?? '');
         $first = vkl_norm($rows[$i][COL_FIRST] ?? '');
         if ($last !== '' && $first !== '' && isset($set[$last]) && isset($set[$first])) { $hits[] = $i; }
@@ -530,6 +578,9 @@ function vkl_texts() {
                  . "Можно и по очереди: сначала фамилию и имя, потом чек.",
         'ask_name' => "Чек получил 👍\nТеперь напиши свои <b>фамилию и имя</b> — как в анкете на сайте.",
         'ask_photo' => "Записал: <b>%s</b>.\nТеперь пришли фото или скриншот чека об оплате.",
+        'not_found' => "Чек получил 👍 Но не нашёл анкету на «%s».\n\n"
+                     . "Напиши, пожалуйста, <b>фамилию и имя точно как в анкете</b> на сайте.\n"
+                     . "Если анкету не заполнял(а) — просто напиши это же имя ещё раз, и я приму чек.",
         'unknown' => "Не совсем понял 🙂\nПришли, пожалуйста, <b>фамилию и имя</b> и <b>фото или скриншот чека</b>.\n\n"
                    . VKL_HELP_CONTACT,
         'thanks' => "Спасибо, %s! Чек получили 💚\n\n"
@@ -657,6 +708,16 @@ function vkl_bot_handle($u) {
         // не знаем, чей чек: спрашиваем имя, файл уже сохранён
         $state[$uid] = $e; vkl_json_save($statePath, $state);
         tg_say($chat, $T['ask_name']);
+        return;
+    }
+
+    // имя не нашлось в анкетах: один раз переспрашиваем — это может быть не имя («В бот тоже скину») или опечатка;
+    // если человек повторит то же имя — значит, анкеты правда нет, принимаем как «чек без анкеты»
+    if ($idx < 0 && $rows !== null && ($e['retry_name'] ?? '') !== implode(' ', $nameTokens)) {
+        $e['retry_name'] = implode(' ', $nameTokens);
+        unset($e['name']);
+        $state[$uid] = $e; vkl_json_save($statePath, $state);
+        tg_say($chat, sprintf($T['not_found'], htmlspecialchars(vkl_pretty($nameTokens))));
         return;
     }
 

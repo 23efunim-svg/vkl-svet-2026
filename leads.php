@@ -2,7 +2,7 @@
 /**
  * Участники конференции для организаторов. Источник — Google-таблица (там все анкеты и дубли),
  * здесь каждый человек один раз: номер по дате первой регистрации, свежие сверху.
- * Категорию (участник / служитель / организатор) можно менять прямо здесь — она пишется в таблицу.
+ * Категорию и «Как оплатил» можно менять прямо здесь — они пишутся в таблицу.
  * Логин и пароль — в secrets/panel-auth.txt вне папки сайта.
  */
 define('VKL_BOOT', 1);
@@ -10,6 +10,7 @@ require __DIR__ . '/bot-lib.php';
 vkl_require_auth('Участники');
 
 define('VKL_SHEET_CACHE', VKL_LEADS . '/sheet-cache.json');
+define('VKL_PAYWAYS', json_encode(['', PAY_CARD, PAY_CASH1000, PAY_CASH500, PAY_FREE], JSON_UNESCAPED_UNICODE));
 
 /** Таблица с коротким кэшем: правки в Google-таблице видны здесь через несколько секунд. */
 function vkl_rows_cached($ttl = 10) {
@@ -21,22 +22,68 @@ function vkl_rows_cached($ttl = 10) {
     return [$rows, time()];
 }
 
-// смена категории со страницы: только fetch со своим заголовком (чужой сайт так не отправит)
-if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_GET['action'] ?? '') === 'role') {
+function rub($n) { return number_format($n, 0, '', ' ') . ' ₽'; }
+function vkl_pay_text($p) {
+    if ($p['state'] === 'paid') { return 'оплачено · ' . rub($p['amount']); }
+    if ($p['state'] === 'free') { return 'не требуется'; }
+    return 'не оплачено · ' . rub($p['amount']);
+}
+
+/**
+ * Правка со страницы: категория или «Как оплатил». Принимаем только fetch со своим заголовком
+ * (чужой сайт так не отправит). Статус в таблице подстраивается, ответ — пересчитанная строка.
+ */
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_GET['action'] ?? '') === 'set') {
     header('Content-Type: application/json; charset=utf-8');
     $in = json_decode(file_get_contents('php://input'), true);
     $row = (int)($in['row'] ?? 0);
-    $role = (string)($in['role'] ?? '');
+    $field = (string)($in['field'] ?? '');
+    $value = (string)($in['value'] ?? '');
     $rows = vkl_sheet_rows();
-    if (($_SERVER['HTTP_X_VKL'] ?? '') !== '1' || !in_array($role, [ROLE_PART, ROLE_SERV, ROLE_ORG], true)
-        || $rows === null || $row < 2 || $row > count($rows) || vkl_is_service_row($rows[$row - 1])) {
-        http_response_code(400); echo '{"ok":false}'; exit;
+    $okInput = ($_SERVER['HTTP_X_VKL'] ?? '') === '1' && $rows !== null && $row >= 2 && $row <= count($rows)
+        && !vkl_is_service_row($rows[$row - 1])
+        && (($field === 'role' && in_array($value, [ROLE_PART, ROLE_SERV, ROLE_ORG], true))
+            || ($field === 'payway' && in_array($value, json_decode(VKL_PAYWAYS, true), true)));
+    if (!$okInput) { http_response_code(400); echo '{"ok":false}'; exit; }
+
+    $r = $rows[$row - 1];
+    $status = trim($r[COL_STATUS] ?? '');
+    $role = trim($r[COL_ROLE] ?? '') ?: ROLE_PART;
+    $hasReceipt = trim($r[COL_RECEIPT] ?? '') !== '' || trim($r[COL_RTIME] ?? '') !== '';
+    if ($field === 'role') {
+        $cells = ['W' . $row => $value];
+        $r[COL_ROLE] = $value;
+        $cells += vkl_status_cells($row, $r);
+    } else {
+        $cells = ['Y' . $row => $value];
+        if (vkl_is_paid_way($value) && in_array($status, ['', ST_WAIT, ST_FREE, ST_RECEIPT], true)) {
+            $cells['B' . $row] = ST_PAID;                       // проверяющий подтвердил оплату
+        } elseif ($value === '' && in_array($status, [ST_PAID, ST_FREE], true)) {
+            $cells['B' . $row] = $hasReceipt ? ST_RECEIPT : ($role === ROLE_ORG ? ST_FREE : ST_WAIT);   // отметку сняли
+        } else {
+            $r[COL_PAYWAY] = $value;
+            $cells += vkl_status_cells($row, $r);
+        }
     }
-    $cells = ['W' . $row => $role] + vkl_role_status_cells($row, $rows[$row - 1][COL_STATUS] ?? '', $role);
     $ok = vkl_sheet_set_cells($cells);
     @unlink(VKL_SHEET_CACHE);
-    if ($ok) { vkl_log('bot.log', 'вручную: строка ' . $row . ' (' . trim(($rows[$row - 1][COL_LAST] ?? '') . ' ' . ($rows[$row - 1][COL_FIRST] ?? '')) . ') → категория «' . $role . '»'); }
-    echo json_encode(['ok' => $ok]);
+    if (!$ok) { echo '{"ok":false}'; exit; }
+
+    foreach ($cells as $a1 => $v) {
+        $col = ['B' => COL_STATUS, 'W' => COL_ROLE, 'Y' => COL_PAYWAY][$a1[0]];
+        $rows[$row - 1][$col] = $v;
+    }
+    $who = trim(($r[COL_LAST] ?? '') . ' ' . ($r[COL_FIRST] ?? ''));
+    vkl_log('bot.log', 'вручную со страницы: строка ' . $row . ' (' . $who . ') ' . ($field === 'role' ? 'категория' : 'как оплатил')
+        . ' → «' . ($value === '' ? '—' : $value) . '»' . (isset($cells['B' . $row]) ? ', статус → «' . $cells['B' . $row] . '»' : ''));
+    $out = ['ok' => true];
+    foreach (vkl_participants($rows) as $p) {
+        if ($p['row'] === $row) {
+            $out += ['state' => $p['state'], 'amount' => $p['amount'], 'cash' => $p['cash'], 'role' => $p['role'],
+                     'payway' => $p['payway'], 'text' => vkl_pay_text($p)];
+        }
+    }
+    echo json_encode($out, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -45,18 +92,12 @@ if ($rows === null) { http_response_code(503); exit('Таблица участн
 $people = vkl_participants($rows);
 
 function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES); }
-function rub($n) { return number_format($n, 0, '', ' ') . ' ₽'; }
 function vkl_date($s) { $t = strtotime((string)$s); return $t ? date('d.m.Y H:i', $t) : (string)$s; }
 function vkl_tg_nick($s) {
     $t = ltrim(preg_replace('#^https?://t\.me/#i', '', trim((string)$s)), '@');
     return preg_match('/^[A-Za-z][A-Za-z0-9_]{3,31}$/', $t) ? $t : '';
 }
 function vkl_fio($r) { return trim(($r[COL_LAST] ?? '') . ' ' . ($r[COL_FIRST] ?? '') . ' ' . ($r[COL_PATR] ?? '')); }
-function vkl_pay_text($p) {
-    if ($p['state'] === 'paid') { return 'оплачено · ' . rub($p['amount']); }
-    if ($p['state'] === 'free') { return 'не требуется'; }
-    return 'не оплачено · ' . rub($p['amount']);
-}
 
 if (isset($_GET['json'])) {
     header('Content-Type: application/json; charset=utf-8');
@@ -64,7 +105,7 @@ if (isset($_GET['json'])) {
         $r = $p['r'];
         return ['num' => $p['num'], 'registered' => $p['first'], 'name' => vkl_fio($r), 'phone' => $r[COL_PHONE] ?? '',
                 'telegram' => $r[COL_TG] ?? '', 'city' => $p['city'], 'age' => $r[COL_AGE] ?? '', 'role' => $p['role'],
-                'state' => $p['state'], 'amount' => $p['amount'], 'church' => $r[COL_CHURCH] ?? ''];
+                'state' => $p['state'], 'payway' => $p['payway'], 'amount' => $p['amount'], 'church' => $r[COL_CHURCH] ?? ''];
     }, $people), JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -75,14 +116,15 @@ if (isset($_GET['csv'])) {
     $out = fopen('php://output', 'w');
     $enc = function ($v) { return iconv('UTF-8', 'Windows-1251//TRANSLIT', (string)$v); };
     fputcsv($out, array_map($enc, ['№', 'Дата регистрации', 'ФИО', 'Телефон', 'Telegram', 'Город', 'Возраст', 'Категория',
-        'Оплата', 'Сумма', 'Церковь', 'Сопровождающий', 'Телефон сопровождающего', 'Вопрос', 'Дата рождения', 'Пол', 'Почта']), ';');
+        'Оплата', 'Сумма', 'Как оплатил', 'Церковь', 'Сопровождающий', 'Телефон сопровождающего', 'Вопрос', 'Дата рождения',
+        'Пол', 'Почта']), ';');
     foreach ($people as $p) {
         $r = $p['r'];
         $pay = ['paid' => 'оплачено', 'wait' => 'не оплачено', 'free' => 'не требуется'][$p['state']];
         fputcsv($out, array_map($enc, [$p['num'], vkl_date($p['first']), vkl_fio($r), $r[COL_PHONE] ?? '', $r[COL_TG] ?? '',
-            $p['city'], $r[COL_AGE] ?? '', $p['role'], $pay, $p['state'] === 'free' ? '' : $p['amount'], $r[COL_CHURCH] ?? '',
-            $r[COL_GNAME] ?? '', $r[COL_GPHONE] ?? '', $r[COL_COMMENT] ?? '', $r[COL_BIRTH] ?? '', $r[COL_GENDER] ?? '',
-            $r[COL_EMAIL] ?? '']), ';');
+            $p['city'], $r[COL_AGE] ?? '', $p['role'], $pay, $p['state'] === 'free' ? '' : $p['amount'], $p['payway'],
+            $r[COL_CHURCH] ?? '', $r[COL_GNAME] ?? '', $r[COL_GPHONE] ?? '', $r[COL_COMMENT] ?? '', $r[COL_BIRTH] ?? '',
+            $r[COL_GENDER] ?? '', $r[COL_EMAIL] ?? '']), ';');
     }
     exit;
 }
@@ -93,6 +135,7 @@ foreach ($people as $p) {
     if ($p['church'] !== '') { $churches[$p['church']] = ($churches[$p['church']] ?? 0) + 1; }
 }
 arsort($cities); arsort($churches);
+$payways = json_decode(VKL_PAYWAYS, true);
 ?><!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -106,7 +149,7 @@ arsort($cities); arsort($churches);
           --yellow:#FFF7AE; --yellow-bg:rgba(255,247,174,.12); --blue:#9CC3EA; --blue-bg:rgba(156,195,234,.13); }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 -apple-system,Segoe UI,Arial,sans-serif; }
-  .wrap { max-width:1560px; margin:0 auto; padding:24px 16px 60px; }
+  .wrap { max-width:1640px; margin:0 auto; padding:24px 16px 60px; }
   .top { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:10px 20px; margin-bottom:18px; }
   h1 { font-size:22px; margin:0; }
   .meta { color:var(--dim); font-size:13px; }
@@ -125,7 +168,7 @@ arsort($cities); arsort($churches);
   .kpi--wait .kpi__v { color:var(--red); }
 
   .filters { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; }
-  .filters input, .filters select, select.role { background:var(--card); color:var(--text); border:1px solid var(--line);
+  .filters input, .filters select, select.edit { background:var(--card); color:var(--text); border:1px solid var(--line);
          padding:8px 10px; font:inherit; font-size:14px; border-radius:2px; }
   .filters input { min-width:220px; flex:1 1 220px; max-width:320px; }
   .shown { color:var(--dim); font-size:13px; margin-left:auto; }
@@ -140,8 +183,8 @@ arsort($cities); arsort($churches);
   td.nw { white-space:nowrap; }
   td.fio { min-width:200px; }
   td a { color:var(--text); text-decoration:none; border-bottom:1px dotted var(--dim); }
-  select.role { padding:4px 6px; font-size:13px; }
-  select.role.is-saving { opacity:.5; }
+  select.edit { padding:4px 6px; font-size:13px; }
+  select.edit.is-saving { opacity:.5; }
   .saved { color:var(--green); font-size:12px; margin-left:4px; }
   .sub { color:var(--dim); font-size:12px; }
   .minor { display:inline-block; margin-left:6px; padding:0 6px; font-size:11px; color:var(--yellow); background:var(--yellow-bg); }
@@ -185,6 +228,7 @@ arsort($cities); arsort($churches);
       <option value="">Любой возраст</option>
       <option value="0-17">до 18 лет</option>
       <option value="18-200">18 и старше</option>
+      <option value="0-13">до 14</option>
       <option value="14-15">14–15</option>
       <option value="16-17">16–17</option>
       <option value="18-24">18–24</option>
@@ -206,6 +250,13 @@ arsort($cities); arsort($churches);
       <option value="wait">Не оплачено</option>
       <option value="free">Не требуется</option>
     </select>
+    <select id="fway">
+      <option value="">Как оплатил: все</option>
+      <option value="<?= PAY_CARD ?>">Безнал</option>
+      <option value="cash">Наличка</option>
+      <option value="<?= PAY_FREE ?>">Бесплатно</option>
+      <option value="none">Не отмечено</option>
+    </select>
     <button class="btn btn--ghost" id="freset" type="button">Сбросить</button>
     <span class="shown" id="shown"></span>
   </div>
@@ -214,7 +265,7 @@ arsort($cities); arsort($churches);
   <table>
     <thead><tr>
       <th>№</th><th>Дата регистрации</th><th>ФИО</th><th>Телефон</th><th>Telegram</th><th>Город</th>
-      <th>Возраст</th><th>Категория</th><th>Оплата</th><th>Церковь</th><th>Сопровождающий</th><th>Вопрос</th>
+      <th>Возраст</th><th>Категория</th><th>Оплата</th><th>Как оплатил</th><th>Церковь</th><th>Сопровождающий</th><th>Вопрос</th>
     </tr></thead>
     <tbody id="tb">
     <?php foreach ($people as $p): $r = $p['r']; $age = trim($r[COL_AGE] ?? ''); $nick = vkl_tg_nick($r[COL_TG] ?? '');
@@ -222,8 +273,7 @@ arsort($cities); arsort($churches);
           $search = mb_strtolower(vkl_fio($r) . ' ' . $phone . ' ' . preg_replace('/\D/', '', $phone) . ' ' . ($r[COL_TG] ?? '')); ?>
       <tr data-row="<?= $p['row'] ?>" data-city="<?= h($p['city']) ?>" data-church="<?= h($p['church']) ?>" data-age="<?= h($age) ?>"
           data-role="<?= h($p['role']) ?>" data-state="<?= $p['state'] ?>" data-amount="<?= $p['amount'] ?>"
-          data-status-paid="<?= vkl_is_paid($p['status']) ? 1 : 0 ?>" data-got="<?= $p['got'] ?>" data-declared="<?= $p['declared'] ?>"
-          data-q="<?= h($search) ?>">
+          data-payway="<?= h($p['payway']) ?>" data-cash="<?= $p['cash'] ? 1 : 0 ?>" data-q="<?= h($search) ?>">
         <td class="num"><?= $p['num'] ?></td>
         <td class="num"><?= h(vkl_date($p['first'])) ?></td>
         <td class="fio"><?= h(vkl_fio($r)) ?><?php if ($p['forms'] > 1): ?><div class="sub">анкет: <?= $p['forms'] ?></div><?php endif; ?></td>
@@ -231,10 +281,13 @@ arsort($cities); arsort($churches);
         <td class="nw"><?php if ($nick !== ''): ?><a href="https://t.me/<?= h($nick) ?>" target="_blank" rel="noopener">@<?= h($nick) ?></a><?php else: ?><?= h($r[COL_TG] ?? '') ?><?php endif; ?></td>
         <td><?= h($p['city']) ?></td>
         <td class="nw"><?= h($age) ?><?php if ($age !== '' && (int)$age < 18): ?><span class="minor">до 18</span><?php endif; ?></td>
-        <td class="nw"><select class="role" aria-label="Категория">
+        <td class="nw"><select class="edit" data-field="role" aria-label="Категория">
           <?php foreach ([ROLE_PART, ROLE_SERV, ROLE_ORG] as $ro): ?><option<?= $ro === $p['role'] ? ' selected' : '' ?>><?= $ro ?></option><?php endforeach; ?>
         </select></td>
-        <td class="pay-cell"><span class="pay pay--<?= $p['state'] ?>"><?= h(vkl_pay_text($p)) ?></span></td>
+        <td><span class="pay pay--<?= $p['state'] ?>"><?= h(vkl_pay_text($p)) ?></span></td>
+        <td class="nw"><select class="edit" data-field="payway" aria-label="Как оплатил">
+          <?php foreach ($payways as $pw): ?><option value="<?= h($pw) ?>"<?= $pw === $p['payway'] ? ' selected' : '' ?>><?= $pw === '' ? '—' : h($pw) ?></option><?php endforeach; ?>
+        </select></td>
         <td><?= h($r[COL_CHURCH] ?? '') ?></td>
         <td><?= h($gname) ?><?php if ($gphone !== ''): ?><div class="sub"><a href="tel:<?= h(preg_replace('/[^\d+]/', '', $gphone)) ?>"><?= h($gphone) ?></a></div><?php endif; ?></td>
         <td><?= h($r[COL_COMMENT] ?? '') ?></td>
@@ -245,46 +298,42 @@ arsort($cities); arsort($churches);
   <div class="empty" id="empty" hidden>Никого не нашлось — измените фильтры.</div>
   </div>
   <p class="note">Каждый человек показан один раз: повторные анкеты склеены, номер — по дате первой регистрации.
-    Полные данные со всеми анкетами — в Google-таблице. Ожидаемая сумма: участник — из анкеты, служитель — <?= rub(vkl_expected(ROLE_SERV, 0)) ?>,
+    Полные данные со всеми анкетами — в Google-таблице. «Как оплатил»: безнал или наличка — оплата подтверждена,
+    «бесплатно» — платить не нужно, «—» — снять отметку. Ожидаемая сумма: участник — <?= rub(vkl_expected(ROLE_PART)) ?>, служитель — <?= rub(vkl_expected(ROLE_SERV)) ?>,
     организатор — не требуется. Если пожертвование отличается, впишите сумму в столбец «Получено, ₽» в Google-таблице.</p>
 </div>
 
 <script>
 (function () {
-  var ROLE_PART = <?= json_encode(ROLE_PART, JSON_UNESCAPED_UNICODE) ?>, ROLE_SERV = <?= json_encode(ROLE_SERV, JSON_UNESCAPED_UNICODE) ?>,
-      ROLE_ORG = <?= json_encode(ROLE_ORG, JSON_UNESCAPED_UNICODE) ?>, SERV_AMOUNT = <?= vkl_expected(ROLE_SERV, 0) ?>;
+  var CARD = <?= json_encode(PAY_CARD, JSON_UNESCAPED_UNICODE) ?>, ORG = <?= json_encode(ROLE_ORG, JSON_UNESCAPED_UNICODE) ?>,
+      SERV = <?= json_encode(ROLE_SERV, JSON_UNESCAPED_UNICODE) ?>, FREEWAY = <?= json_encode(PAY_FREE, JSON_UNESCAPED_UNICODE) ?>;
   var rows = Array.prototype.slice.call(document.querySelectorAll('#tb tr'));
   var $ = function (id) { return document.getElementById(id); };
-  var f = { q: $('fq'), city: $('fcity'), age: $('fage'), church: $('fchurch'), role: $('frole'), state: $('fstate') };
+  var f = { q: $('fq'), city: $('fcity'), age: $('fage'), church: $('fchurch'), role: $('frole'), state: $('fstate'), way: $('fway') };
   var money = function (n) { return n.toLocaleString('ru-RU').replace(/\s/g, ' ') + ' ₽'; };
   var people = function (n) {
     var m10 = n % 10, m100 = n % 100;
     return n + ((m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) ? ' человека' : ' человек');
   };
-
-  /* то же правило, что на сервере: кто сколько должен и оплачено ли */
-  function recalc(tr) {
-    var d = tr.dataset, role = d.role, got = +d.got, declared = +d.declared;
-    var expected = role === ROLE_ORG ? 0 : (role === ROLE_SERV ? SERV_AMOUNT : declared);
-    var paid = d.statusPaid === '1' || got > 0;
-    d.state = paid ? 'paid' : (expected > 0 ? 'wait' : 'free');
-    d.amount = paid ? (got > 0 ? got : (role === ROLE_SERV ? expected : declared)) : expected;
-    var span = tr.querySelector('.pay');
-    span.className = 'pay pay--' + d.state;
-    span.textContent = d.state === 'paid' ? 'оплачено · ' + money(+d.amount)
-                     : d.state === 'free' ? 'не требуется' : 'не оплачено · ' + money(+d.amount);
-  }
+  var wayOk = function (d) {
+    var w = f.way.value;
+    if (!w) return true;
+    if (w === 'cash') return d.cash === '1';
+    if (w === 'none') return d.payway === '';
+    return d.payway === w;
+  };
 
   function apply() {
     var q = f.q.value.trim().toLowerCase(), qd = q.replace(/\D/g, '');
     var age = f.age.value ? f.age.value.split('-').map(Number) : null;
-    var shown = 0, cities = {}, paidN = 0, paidSum = 0, waitN = 0, waitSum = 0, minors = 0, orgs = 0, servs = 0;
+    var shown = 0, cities = {}, paidN = 0, paidSum = 0, cashSum = 0, waitN = 0, waitSum = 0, minors = 0, orgs = 0, servs = 0;
     rows.forEach(function (tr) {
       var d = tr.dataset, a = parseInt(d.age, 10);
       var ok = (!f.city.value || d.city === f.city.value)
         && (!f.church.value || d.church === f.church.value)
         && (!f.role.value || d.role === f.role.value)
         && (!f.state.value || d.state === f.state.value)
+        && wayOk(d)
         && (!age || (!isNaN(a) && a >= age[0] && a <= age[1]))
         && (!q || d.q.indexOf(q) !== -1 || (qd.length >= 4 && d.q.indexOf(qd) !== -1));
       tr.hidden = !ok;
@@ -292,9 +341,9 @@ arsort($cities); arsort($churches);
       shown++;
       if (d.city) cities[d.city] = 1;
       if (!isNaN(a) && a < 18) minors++;
-      if (d.role === ROLE_ORG) orgs++;
-      if (d.role === ROLE_SERV) servs++;
-      if (d.state === 'paid') { paidN++; paidSum += +d.amount; }
+      if (d.role === ORG) orgs++;
+      if (d.role === SERV) servs++;
+      if (d.state === 'paid') { paidN++; paidSum += +d.amount; if (d.cash === '1') cashSum += +d.amount; }
       if (d.state === 'wait') { waitN++; waitSum += +d.amount; }
     });
     var cityList = Object.keys(cities);
@@ -303,7 +352,7 @@ arsort($cities); arsort($churches);
     $('kCity').textContent = cityList.length;
     $('kCityS').textContent = cityList.length === 1 ? cityList[0] : '';
     $('kPaid').textContent = money(paidSum);
-    $('kPaidS').textContent = people(paidN);
+    $('kPaidS').textContent = people(paidN) + ' · наличными ' + money(cashSum);
     $('kWait').textContent = money(waitSum);
     $('kWaitS').textContent = people(waitN) + (orgs ? ' · организаторы не считаются' : '');
     $('shown').textContent = shown === rows.length ? 'Всего: ' + rows.length : 'Показано: ' + shown + ' из ' + rows.length;
@@ -315,25 +364,31 @@ arsort($cities); arsort($churches);
     } catch (e) {}
   }
 
-  /* смена категории: сразу пишем в Google-таблицу */
+  /* правка категории или «Как оплатил»: сразу пишем в Google-таблицу, строку пересчитывает сервер */
   rows.forEach(function (tr) {
-    var sel = tr.querySelector('select.role');
-    sel.addEventListener('change', function () {
-      var prev = tr.dataset.role, next = sel.value;
-      sel.classList.add('is-saving'); sel.disabled = true;
-      fetch('leads.php?action=role', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-VKL': '1' },
-        body: JSON.stringify({ row: +tr.dataset.row, role: next })
-      }).then(function (r) { return r.json(); }).then(function (res) {
-        if (!res.ok) throw new Error('save');
-        tr.dataset.role = next; recalc(tr); apply();
-        var ok = document.createElement('span'); ok.className = 'saved'; ok.textContent = '✓';
-        sel.parentNode.appendChild(ok); setTimeout(function () { ok.remove(); }, 1500);
-      }).catch(function () {
-        sel.value = prev;
-        alert('Не удалось сохранить категорию. Проверьте интернет и попробуйте ещё раз.');
-      }).then(function () { sel.classList.remove('is-saving'); sel.disabled = false; });
+    Array.prototype.forEach.call(tr.querySelectorAll('select.edit'), function (sel) {
+      var prev = sel.value;
+      sel.addEventListener('change', function () {
+        var next = sel.value;
+        sel.classList.add('is-saving'); sel.disabled = true;
+        fetch('leads.php?action=set', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-VKL': '1' },
+          body: JSON.stringify({ row: +tr.dataset.row, field: sel.dataset.field, value: next })
+        }).then(function (r) { return r.json(); }).then(function (res) {
+          if (!res.ok || !res.state) throw new Error('save');
+          var d = tr.dataset;
+          d.role = res.role; d.state = res.state; d.amount = res.amount; d.payway = res.payway; d.cash = res.cash ? '1' : '0';
+          var span = tr.querySelector('.pay');
+          span.className = 'pay pay--' + res.state; span.textContent = res.text;
+          prev = next; apply();
+          var ok = document.createElement('span'); ok.className = 'saved'; ok.textContent = '✓';
+          sel.parentNode.appendChild(ok); setTimeout(function () { ok.remove(); }, 1500);
+        }).catch(function () {
+          sel.value = prev;
+          alert('Не удалось сохранить. Проверьте интернет и попробуйте ещё раз.');
+        }).then(function () { sel.classList.remove('is-saving'); sel.disabled = false; });
+      });
     });
   });
 

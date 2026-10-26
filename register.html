@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#16150F">
 <link rel="icon" href="assets/logo/vkl-round.svg" type="image/svg+xml">
 <link rel="preload" href="assets/fonts/europebold.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/css/style.css?v=1014betmo">
+<link rel="stylesheet" href="assets/css/style.css?v=1026pay">
 </head>
 <body>
 
@@ -73,7 +73,7 @@
           <div class="row2">
             <div class="field">
               <label for="birthDate">Дата рождения <span class="req">*</span></label>
-              <input type="date" id="birthDate" name="birthDate" required min="1930-01-01" max="2015-12-31">
+              <input type="date" id="birthDate" name="birthDate" required min="1930-01-01" max="2026-11-26">
               <div class="field__err">Укажи дату рождения</div>
             </div>
             <div class="field">
@@ -206,13 +206,19 @@
             <h2 class="h3 pay__t">Осталось внести пожертвование</h2>
 
             <div class="pay__grid">
-              <div class="pay__qr">
-                <img src="assets/img/qr-pay.png" alt="QR-код для оплаты" width="330" height="330">
+              <div class="pay__qrcol">
+                <div class="pay__qr">
+                  <img src="assets/img/qr-pay.png" alt="QR-код для оплаты" width="330" height="330">
+                </div>
+                <a class="btn pay__link" href="https://qr.nspk.ru/AS1A0036K4VBM12L9CC9U4D3BNNPDQLV?type=01&amp;bank=100000000111&amp;crc=38E7"
+                   target="_blank" rel="noopener">Открыть оплату в банке</a>
+                <p class="dim pay__linkhint">С телефона откроется список банков — выбери свой, приложение откроется само</p>
               </div>
 
               <ol class="pay__steps">
                 <li>
-                  <b>Отсканируй QR-код</b> в приложении банка.
+                  <b>Отсканируй QR-код</b> в приложении банка. Если ты с телефона —
+                  нажми <b>«Открыть оплату в банке»</b> и выбери свой банк.
                 </li>
                 <li>
                   Укажи сумму <b class="green">1000 <span class="rub">₽</span></b>
@@ -285,6 +291,6 @@
 </div>
 
 <script src="assets/js/app.js?v=10192345"></script>
-<script src="assets/js/register.js?v=10192345"></script>
+<script src="assets/js/register.js?v=10261300"></script>
 </body>
 </html>
